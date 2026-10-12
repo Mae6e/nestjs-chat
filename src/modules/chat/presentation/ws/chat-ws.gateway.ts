@@ -330,11 +330,23 @@ export class ChatWsGateway
       throw new WsException('Conversation not found');
     }
 
-    const [currentUser, targetUser, blockStatus] = await Promise.all([
-      this.userIntegrationPort.getUserById(authUserId),
-      this.userIntegrationPort.getUserById(targetMember.userId),
-      this.userIntegrationPort.getBlockStatus(authUserId, targetMember.userId),
+    const users = await this.userIntegrationPort.getUsersByIds([
+      authUserId,
+      targetMember.userId,
     ]);
+
+    const currentUser = users.find((u) => u.id === authUserId);
+    const targetUser = users.find((u) => u.id === targetMember.userId);
+
+    if (!currentUser || !targetUser) {
+      throw new WsException('User not found.');
+    }
+
+    const blockStatus = await this.userIntegrationPort.getBlockStatus(
+      authUserId,
+      targetMember.userId,
+    );
+
     if (blockStatus.isBlocker) {
       throw new WsException(
         'You need to unblock the user before sending a message.',

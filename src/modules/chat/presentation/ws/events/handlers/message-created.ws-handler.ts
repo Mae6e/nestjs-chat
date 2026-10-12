@@ -62,17 +62,24 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
     }
 
     try {
-      const [currentUser, targetUser] = await Promise.all([
-        this.userIntegrationPort.getUserById(senderUserId),
-        this.userIntegrationPort.getUserById(targetMember.userId),
+      const users = await this.userIntegrationPort.getUsersByIds([
+        senderUserId,
+        targetMember.userId,
       ]);
+
+      const currentUser = users.find((u) => u.id === senderUserId);
+      const targetUser = users.find((u) => u.id === targetMember.userId);
 
       const rooms: string[] = [];
       if (!event.deletedForUserIds.includes(targetUser.id)) {
         rooms.push(`user-${targetUser.id}`);
       }
       // Also broadcast to the sender's user room for multi-device sync
-      rooms.push(`user-${currentUser.id}`);
+      // rooms.push(`user-${currentUser.id}`);
+
+      if (!rooms || !rooms.length) {
+        return;
+      }
 
       await this.chatWsGateway.serverBroadcast<UserMessageCreated>(
         this.chatWsGateway.server,
@@ -84,13 +91,11 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
           user: {
             id: currentUser.id,
             username: currentUser.username,
-            name: `${currentUser.firstName} ${currentUser.lastName}`,
             avatar: currentUser.avatar,
           },
           content: event.text,
           conversation: {
             id: conversationDto.id,
-            name: `${currentUser.firstName} ${currentUser.lastName}`,
             avatar: currentUser.avatar,
             username: currentUser.username,
           },
