@@ -1,4 +1,4 @@
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberEntity } from '@modules/chat/domain/models/conversation-member.model';
 import { v7 as uuidv7 } from 'uuid';

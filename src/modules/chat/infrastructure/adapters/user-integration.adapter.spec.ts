@@ -1,12 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserIntegrationAdapter } from './user-integration.adapter';
 import { QueryBus } from '@nestjs/cqrs';
-import { GetUserByIdQuery } from '@modules/user/application/queries/get-user-by-id/get-user-by-id.query';
-import { GetBlockStatusQuery } from '@modules/user/application/queries/get-block-status/get-block-status.query';
-import { GetUsersByIdsQuery } from '@modules/user/application/queries/get-users-by-ids/get-users-by-ids.query';
-import { GetUserIdsByNameOrUsernameQuery } from '@modules/user/application/queries/get-user-ids-by-name-or-username/get-user-ids-by-name-or-username.query';
-import { GetBlockedUsersIdsQuery } from '@modules/user/application/queries/get-blocked-users-ids/get-blocked-users-ids.query';
-import { UserNotFoundException } from '@modules/user/domain/user.exceptions';
+import { GetBlockStatusQuery } from '@modules/chat/application/queries/get-block-status/get-block-status.query';
+import { GetBlockedUsersIdsQuery } from '@modules/chat/application/queries/get-blocked-users-ids/get-blocked-users-ids.query';
+import { UserNotFoundException } from '@modules/chat/domain/chat.exceptions';
 
 describe('UserIntegrationAdapter', () => {
   let adapter: UserIntegrationAdapter;

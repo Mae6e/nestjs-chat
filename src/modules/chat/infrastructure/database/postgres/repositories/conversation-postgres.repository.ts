@@ -7,8 +7,9 @@ import { ConversationRepositoryPort } from '@modules/chat/application/ports/conv
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
+import { UserBlock } from '../entities/user-block.entity';
 
 @Injectable()
 export class ConversationPostgresRepository implements ConversationRepositoryPort {
@@ -132,5 +133,67 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
     });
 
     return res;
+  }
+
+  async block(blockerId: string, blockedId: string): Promise<boolean> {
+    return this.dataSource.transaction(async (entityManager) => {
+      const status = await entityManager
+        .getRepository(UserBlock)
+        .createQueryBuilder('ub')
+        .where('blocker_id = :blockerId', { blockerId })
+        .andWhere('blocked_id = :blockedId', { blockedId })
+        .getExists();
+      if (status == true) {
+        return false;
+      }
+
+      const userBlock = new UserBlock();
+      userBlock.blocker_id = blockerId;
+      userBlock.blocked_id = blockedId;
+
+      await entityManager.getRepository(UserBlock).insert(userBlock);
+
+      return true;
+    });
+  }
+
+  async unblock(blockerId: string, blockedId: string): Promise<boolean> {
+    const res = await this.dataSource
+      .getRepository(UserBlock)
+      .createQueryBuilder()
+      .where('blocker_id = :blockerId', { blockerId })
+      .andWhere('blocked_id = :blockedId', { blockedId })
+      .softDelete()
+      .execute();
+
+    return res.affected !== 0;
+  }
+
+  async getBlockStatus(blockerId: string, blockedId: string): Promise<boolean> {
+    return this.dataSource
+      .getRepository(UserBlock)
+      .createQueryBuilder('ub')
+      .where('blocker_id = :blockerId', { blockerId })
+      .andWhere('blocked_id = :blockedId', { blockedId })
+      .getExists();
+  }
+
+  async getBlockedUserIds(
+    blockerId: string,
+    blockedIds?: string[],
+  ): Promise<string[]> {
+    const query = this.dataSource
+      .getRepository(UserBlock)
+      .createQueryBuilder('ub')
+      .select('blocked_id', 'blockedId')
+      .where('blocker_id = :userId', { userId: blockerId }); // Fix from :userId to match param, was previously bugged? Ah, in target it was userId
+
+    if (blockedIds?.length) {
+      query.andWhere('blocked_id IN (:...blockedIds)', { blockedIds }); // Fixed missing 's'
+    }
+
+    const res = await query.getRawMany<any>();
+
+    return res.map((r) => r.blockedId);
   }
 }

@@ -59,6 +59,9 @@ export class Initial1784893337624 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "chat"."deleted_messages" ADD CONSTRAINT "FK_af4864dee9672d02ce3d5ecdfa6" FOREIGN KEY ("message_id") REFERENCES "chat"."messages"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
     );
+    await queryRunner.query(
+      `CREATE TABLE "chat"."user_blocks" ("blocker_id" uuid NOT NULL, "blocked_id" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_48667515438e7d0f0fed998b193" PRIMARY KEY ("blocker_id", "blocked_id"))`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -101,5 +104,13 @@ export class Initial1784893337624 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "chat"."messages"`);
     await queryRunner.query(`DROP TYPE "chat"."messages_type_enum"`);
     await queryRunner.query(`DROP SCHEMA IF EXISTS "chat" CASCADE`);
+
+    await queryRunner.query(
+      `ALTER TABLE "chat"."user_blocks" DROP CONSTRAINT "FK_7a0806a54f0ad9ced3e247cacd1"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chat"."user_blocks" DROP CONSTRAINT "FK_dfcd8a81016d1de587fbd2d70bf"`,
+    );
+    await queryRunner.query(`DROP TABLE "chat"."user_blocks"`);
   }
 }

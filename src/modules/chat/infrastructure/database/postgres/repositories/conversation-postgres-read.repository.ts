@@ -316,4 +316,32 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
 
     return PaginationHelper.createResult(dtos, count, pagination);
   }
+
+  async getBlockStatus(blockerId: string, blockedId: string): Promise<boolean> {
+    const res = await this.conversationRepository
+      .createQueryBuilder('ub')
+      .where('blocker_id = :blockerId', { blockerId })
+      .andWhere('blocked_id = :blockedId', { blockedId })
+      .getExists();
+
+    return res;
+  }
+
+  async getBlockedUserIds(
+    blockerId: string,
+    blockedIds?: string[],
+  ): Promise<string[]> {
+    const query = this.conversationRepository
+      .createQueryBuilder('ub')
+      .select('blocked_id', 'blockedId')
+      .where('blocker_id = :userId', { userId: blockerId }); // Fixed variable interpolation
+
+    if (blockedIds?.length) {
+      query.andWhere('blocked_id IN (:...blockedIds)', { blockedIds }); // Fixed s
+    }
+
+    const res = await query.getRawMany<{ blockedId: string }>();
+
+    return res.map((r) => r.blockedId);
+  }
 }

@@ -6,8 +6,6 @@ import { httpConfig } from '@infrastructure/http/http.config';
 import { LoggerModule } from '@infrastructure/logger/logger.module';
 import { wsConfig } from '@infrastructure/websocket/ws.config';
 import { RedisModule } from '@infrastructure/redis/redis.module';
-import { UserModule } from '@modules/user/user.module';
-import { AuthModule } from '@modules/auth/auth.module';
 import { DatabaseModule } from '@infrastructure/database/database.module';
 import { DatabaseType } from '@infrastructure/database/database-type.enum';
 
@@ -22,8 +20,6 @@ import { DatabaseType } from '@infrastructure/database/database-type.enum';
     DatabaseModule.register(DatabaseType.POSTGRES),
     LoggerModule.forRoot({ isGlobal: true }),
     RedisModule,
-    UserModule,
-    AuthModule,
     ChatModule,
   ],
 })

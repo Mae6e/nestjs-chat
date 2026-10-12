@@ -1,5 +1,5 @@
 import { Entity } from '@common/domain/entity';
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { v7 as uuidv7 } from 'uuid';
 

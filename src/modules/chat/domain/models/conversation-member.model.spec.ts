@@ -1,6 +1,6 @@
 import { ConversationMemberEntity } from './conversation-member.model';
 import { ConversationEntity } from './conversation.model';
-import { MessageEntity } from './message.entity';
+import { MessageEntity } from './message.model';
 
 describe('ConversationMemberEntity', () => {
   it('should create correctly', () => {

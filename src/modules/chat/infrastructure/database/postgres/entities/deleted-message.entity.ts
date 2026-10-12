@@ -1,4 +1,5 @@
 import {
+  Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
@@ -13,7 +14,7 @@ import { Message } from '@modules/chat/infrastructure/database/postgres/entities
   comment: 'messages that are deleted for users',
 })
 export class DeletedMessage {
-  @PrimaryColumn({ type: 'uuid' })
+  @PrimaryColumn({ type: 'char', length: 24 })
   user_id: string;
 
   @PrimaryColumn({ type: 'uuid' })

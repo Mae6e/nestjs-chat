@@ -9,11 +9,12 @@ import { Message } from '@modules/chat/infrastructure/database/postgres/entities
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
+import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature(
-      [Conversation, Message, ConversationMember, DeletedMessage],
+      [Conversation, Message, ConversationMember, DeletedMessage, UserBlock],
       DatabaseType.POSTGRES,
     ),
   ],

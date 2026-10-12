@@ -215,4 +215,26 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.meta.total).toBe(1);
     });
   });
+
+  describe('getBlockStatus', () => {
+    it('should return boolean', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(true);
+      const result = await repository.getBlockStatus('user-1', 'user-2');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getBlockedUserIds', () => {
+    it('should return array of ids without blockedIds filter', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([{ blockedId: 'user-2' }]);
+      const result = await repository.getBlockedUserIds('user-1');
+      expect(result).toEqual(['user-2']);
+    });
+
+    it('should return array of ids with blockedIds filter', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([{ blockedId: 'user-2' }]);
+      const result = await repository.getBlockedUserIds('user-1', ['user-2']);
+      expect(result).toEqual(['user-2']);
+    });
+  });
 });
