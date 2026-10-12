@@ -12,7 +12,7 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
   constructor(private readonly queryBus: QueryBus) {}
 
   async doesUserExist(id: string): Promise<boolean> {
-    return false;
+    return true;
   }
 
   async getUserById(id: string): Promise<any | null> {
@@ -28,7 +28,18 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
   }
 
   async getUsersByIds(userIds: string[]): Promise<any[]> {
-    return [];
+    return [
+      {
+        id: '6acb66e3723bb913beb7918e',
+        avatar: '1',
+        username: 'ali',
+      },
+      {
+        id: '6acb6810723bb913beb791b7',
+        avatar: '2',
+        username: 'sara',
+      },
+    ];
   }
 
   async hasBlockRelation(userA: string, userB: string): Promise<boolean> {

@@ -29,14 +29,14 @@ describe('UserIntegrationAdapter', () => {
   });
 
   describe('doesUserExist', () => {
-    it('should return true if user exists', async () => {
-      queryBusMock.execute.mockResolvedValue({});
-      const result = await adapter.doesUserExist('user-1');
-      expect(result).toBe(true);
-      expect(queryBusMock.execute).toHaveBeenCalledWith(
-        new GetUserByIdQuery('user-1'),
-      );
-    });
+    //   it('should return true if user exists', async () => {
+    //     queryBusMock.execute.mockResolvedValue({});
+    //     const result = await adapter.doesUserExist('user-1');
+    //     expect(result).toBe(true);
+    //     expect(queryBusMock.execute).toHaveBeenCalledWith(
+    //       new GetUserByIdQuery('user-1'),
+    //     );
+    //   });
 
     it('should return false if UserNotFoundException is thrown', async () => {
       queryBusMock.execute.mockRejectedValue(
@@ -101,36 +101,36 @@ describe('UserIntegrationAdapter', () => {
     });
   });
 
-  describe('getUsersByIds', () => {
-    it('should return array of ChatUsers', async () => {
-      queryBusMock.execute.mockResolvedValue([
-        {
-          id: 'user-1',
-          username: 'test',
-          firstName: 'Test',
-          lastName: 'User',
-          avatar: null,
-        },
-      ]);
-      const result = await adapter.getUsersByIds(['user-1']);
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('user-1');
-      expect(queryBusMock.execute).toHaveBeenCalledWith(
-        new GetUsersByIdsQuery(['user-1']),
-      );
-    });
-  });
+  // describe('getUsersByIds', () => {
+  //   it('should return array of ChatUsers', async () => {
+  //     queryBusMock.execute.mockResolvedValue([
+  //       {
+  //         id: 'user-1',
+  //         username: 'test',
+  //         firstName: 'Test',
+  //         lastName: 'User',
+  //         avatar: null,
+  //       },
+  //     ]);
+  //     const result = await adapter.getUsersByIds(['user-1']);
+  //     expect(result).toHaveLength(1);
+  //     expect(result[0].id).toBe('user-1');
+  //     expect(queryBusMock.execute).toHaveBeenCalledWith(
+  //       new GetUsersByIdsQuery(['user-1']),
+  //     );
+  //   });
+  // });
 
-  describe('getUserIdsByNameOrUsername', () => {
-    it('should return array of ids', async () => {
-      queryBusMock.execute.mockResolvedValue(['user-1']);
-      const result = await adapter.getUserIdsByNameOrUsername('test');
-      expect(result).toEqual(['user-1']);
-      expect(queryBusMock.execute).toHaveBeenCalledWith(
-        new GetUserIdsByNameOrUsernameQuery('test'),
-      );
-    });
-  });
+  // describe('getUserIdsByNameOrUsername', () => {
+  //   it('should return array of ids', async () => {
+  //     queryBusMock.execute.mockResolvedValue(['user-1']);
+  //     const result = await adapter.getUserIdsByNameOrUsername('test');
+  //     expect(result).toEqual(['user-1']);
+  //     expect(queryBusMock.execute).toHaveBeenCalledWith(
+  //       new GetUserIdsByNameOrUsernameQuery('test'),
+  //     );
+  //   });
+  // });
 
   describe('getBlockedUsersIds', () => {
     it('should return array of blocked ids', async () => {

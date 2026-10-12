@@ -9,7 +9,7 @@ import { ConversationEntity } from '@modules/chat/domain/models/conversation.mod
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
-import { UserBlock } from '../entities/user-block.entity';
+import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
 
 @Injectable()
 export class ConversationPostgresRepository implements ConversationRepositoryPort {

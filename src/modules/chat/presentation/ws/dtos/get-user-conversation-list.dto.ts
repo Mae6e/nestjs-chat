@@ -21,7 +21,6 @@ export class GetUserConversationListRequest {
 export class UserConversationListItemMessageUser {
   id: string;
   username: string;
-  name: string;
 }
 
 export class UserConversationListItemMessage {

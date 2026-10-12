@@ -8,7 +8,6 @@ export class ConversationCreatedEvent extends BaseWsEvent<ConversationCreated> {
 
 export class ConversationCreated {
   id: string;
-  name: string;
   avatar: string;
   username: string;
   lastMessage: ConversationMessage;
@@ -25,5 +24,5 @@ export class ConversationMessage {
 
 export class ConversationMessageUser {
   id: string;
-  name: string;
+  username: string;
 }

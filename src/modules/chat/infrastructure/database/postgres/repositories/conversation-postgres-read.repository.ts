@@ -11,6 +11,8 @@ import { GetUserConversationIdsOptions } from '@modules/chat/application/ports/o
 import { GetUserConversationListOptions } from '@modules/chat/application/ports/options/get-user-conversation-list.options';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
+import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
+
 import {
   PaginatedResult,
   PaginationOptions,
@@ -26,6 +28,8 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(ConversationMember, DatabaseType.POSTGRES)
     private readonly conversationMemberRepository: Repository<ConversationMember>,
+    @InjectRepository(UserBlock, DatabaseType.POSTGRES)
+    private readonly userBlockRepository: Repository<UserBlock>,
     @InjectDataSource(DatabaseType.POSTGRES)
     private readonly dataSource: DataSource,
   ) {}
@@ -318,7 +322,7 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
   }
 
   async getBlockStatus(blockerId: string, blockedId: string): Promise<boolean> {
-    const res = await this.conversationRepository
+    const res = await this.userBlockRepository
       .createQueryBuilder('ub')
       .where('blocker_id = :blockerId', { blockerId })
       .andWhere('blocked_id = :blockedId', { blockedId })
@@ -331,7 +335,7 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     blockerId: string,
     blockedIds?: string[],
   ): Promise<string[]> {
-    const query = this.conversationRepository
+    const query = this.userBlockRepository
       .createQueryBuilder('ub')
       .select('blocked_id', 'blockedId')
       .where('blocker_id = :userId', { userId: blockerId }); // Fixed variable interpolation

@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'user', name: 'user_blocks' })
+@Entity({ schema: 'chat', name: 'user_blocks' })
 export class UserBlock {
   @PrimaryColumn({ type: 'char', length: 24 })
   blocker_id: string;

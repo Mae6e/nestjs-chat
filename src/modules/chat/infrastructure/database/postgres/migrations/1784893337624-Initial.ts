@@ -27,7 +27,7 @@ export class Initial1784893337624 implements MigrationInterface {
       `CREATE UNIQUE INDEX "conversations_identifier_uniq" ON "chat"."conversations"  ("identifier") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "chat"."conversation_members" ("id" uuid NOT NULL, "user_id" uuid NOT NULL, "conversation_id" uuid NOT NULL, "last_seen_message_id" uuid, "last_message_id" uuid, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_33146a476696a973a14d931e675" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "chat"."conversation_members" ("id" uuid NOT NULL, "user_id" char(24) NOT NULL, "conversation_id" uuid NOT NULL, "last_seen_message_id" uuid, "last_message_id" uuid, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_33146a476696a973a14d931e675" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "conversation_members_user_id_idx" ON "chat"."conversation_members" ("user_id")`,
@@ -36,7 +36,7 @@ export class Initial1784893337624 implements MigrationInterface {
       `CREATE UNIQUE INDEX "conversation_members_conversation_user_uniq" ON "chat"."conversation_members" ("conversation_id", "user_id")`,
     );
     await queryRunner.query(
-      `CREATE TABLE "chat"."deleted_messages" ("user_id" uuid NOT NULL, "message_id" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_291432ce5670ad7a99d1ec20818" PRIMARY KEY ("user_id", "message_id"))`,
+      `CREATE TABLE "chat"."deleted_messages" ("user_id" char(24) NOT NULL, "message_id" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_291432ce5670ad7a99d1ec20818" PRIMARY KEY ("user_id", "message_id"))`,
     );
     await queryRunner.query(
       `COMMENT ON TABLE "chat"."deleted_messages" IS 'messages that are deleted for users'`,
@@ -60,7 +60,7 @@ export class Initial1784893337624 implements MigrationInterface {
       `ALTER TABLE "chat"."deleted_messages" ADD CONSTRAINT "FK_af4864dee9672d02ce3d5ecdfa6" FOREIGN KEY ("message_id") REFERENCES "chat"."messages"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
     );
     await queryRunner.query(
-      `CREATE TABLE "chat"."user_blocks" ("blocker_id" uuid NOT NULL, "blocked_id" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_48667515438e7d0f0fed998b193" PRIMARY KEY ("blocker_id", "blocked_id"))`,
+      `CREATE TABLE "chat"."user_blocks" ("blocker_id" char(24) NOT NULL, "blocked_id" char(24) NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_48667515438e7d0f0fed998b193" PRIMARY KEY ("blocker_id", "blocked_id"))`,
     );
   }
 

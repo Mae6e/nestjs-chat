@@ -12,9 +12,30 @@ import { CommandHandlers } from './application/commands';
 import { QueryHandlers } from './application/queries';
 import { EventHandlers } from './presentation/ws/events/handlers';
 import { ChatHttpController } from './presentation/http/chat-http.controller';
+import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { authConfig } from '@infrastructure/config/auth.config';
 
 @Module({
-  imports: [CqrsModule, ChatDatabaseModule],
+  imports: [
+    CqrsModule,
+    ChatDatabaseModule,
+    ConfigModule,
+    ConfigModule.forFeature(authConfig),
+    JwtModule.register({
+      signOptions: {
+        algorithm: 'RS256',
+        issuer: 'nestjs-chat',
+        audience: 'nestjs-chat-client',
+      },
+      verifyOptions: {
+        algorithms: ['RS256'],
+        issuer: 'nestjs-chat',
+        audience: 'nestjs-chat-client',
+        clockTolerance: 15,
+      },
+    }),
+  ],
   providers: [
     ChatWsGateway,
     ChatWsGuard,
