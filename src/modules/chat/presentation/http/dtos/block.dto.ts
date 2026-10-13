@@ -4,7 +4,6 @@ import { ApiProperty } from '@nestjs/swagger';
 export class BlockRequestBody {
   @ApiProperty()
   @IsNotEmpty()
-  @IsUUID()
   targetUserId: string;
 }
 

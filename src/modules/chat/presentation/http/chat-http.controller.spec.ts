@@ -4,7 +4,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { BlockUserCommand } from '@modules/chat/application/commands/block-user/block-user.command';
 import { UnblockUserCommand } from '@modules/chat/application/commands/unblock-user/unblock-user.command';
 import { ConflictException } from '@nestjs/common';
-import { UserHttpGuard } from './guards/user-http.guard';
+import { UserHttpGuard } from './guards/chat-http.guard';
 
 describe('ChatHttpController', () => {
   let controller: ChatHttpController;

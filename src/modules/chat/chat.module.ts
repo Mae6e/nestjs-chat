@@ -15,6 +15,7 @@ import { ChatHttpController } from './presentation/http/chat-http.controller';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { authConfig } from '@infrastructure/config/auth.config';
+import { ChatHttpGuard } from './presentation/http/guards/chat-http.guard';
 
 @Module({
   imports: [
@@ -42,7 +43,7 @@ import { authConfig } from '@infrastructure/config/auth.config';
     ...CommandHandlers,
     ...QueryHandlers,
     ...EventHandlers,
-    // UserHttpGuard,
+    ChatHttpGuard,
     { provide: AuthIntegrationPort, useClass: AuthIntegrationAdapter },
     {
       provide: UserIntegrationPort,

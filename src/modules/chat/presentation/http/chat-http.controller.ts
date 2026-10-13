@@ -26,10 +26,10 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { UserHttpGuard } from '@modules/chat/presentation/http/guards/user-http.guard';
+import { ChatHttpGuard } from '@modules/chat/presentation/http/guards/chat-http.guard';
 
-@Controller('user')
-@ApiTags('User')
+@Controller('/v1/chat')
+@ApiTags('Chat')
 export class ChatHttpController {
   constructor(private readonly commandBus: CommandBus) {}
 
@@ -46,7 +46,7 @@ export class ChatHttpController {
     description: 'User is already blocked',
   })
   @Post('block')
-  @UseGuards(UserHttpGuard)
+  @UseGuards(ChatHttpGuard)
   async block(
     @Body() body: BlockRequestBody,
     @CurrentUserId() authUserId: string,
@@ -72,7 +72,7 @@ export class ChatHttpController {
   })
   @ApiNoContentResponse({ type: null, description: 'User was not blocked' })
   @Delete('block/:targetUserId')
-  @UseGuards(UserHttpGuard)
+  @UseGuards(ChatHttpGuard)
   async unblock(
     @Param() params: UnblockRequestParams,
     @CurrentUserId() authUserId: string,

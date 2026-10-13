@@ -3,8 +3,8 @@ import { AuthIntegrationPort } from '@modules/chat/application/ports/auth-integr
 import { BaseHttpAuthGuard } from '@common/http/guards/base-http-auth.guard';
 
 @Injectable()
-export class UserHttpGuard extends BaseHttpAuthGuard {
-  protected readonly logger = new Logger(UserHttpGuard.name);
+export class ChatHttpGuard extends BaseHttpAuthGuard {
+  protected readonly logger = new Logger(ChatHttpGuard.name);
 
   constructor(private readonly authIntegrationPort: AuthIntegrationPort) {
     super();

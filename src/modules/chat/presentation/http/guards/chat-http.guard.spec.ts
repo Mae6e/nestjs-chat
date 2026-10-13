@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UserHttpGuard } from './user-http.guard';
+import { ChatHttpGuard } from './chat-http.guard';
 import { AuthIntegrationPort } from '@modules/chat/application/ports/auth-integration.port';
 
-describe('UserHttpGuard', () => {
-  let guard: UserHttpGuard;
+describe('ChatHttpGuard', () => {
+  let guard: ChatHttpGuard;
   let authIntegrationPort: jest.Mocked<AuthIntegrationPort>;
 
   beforeEach(async () => {
@@ -13,7 +13,7 @@ describe('UserHttpGuard', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UserHttpGuard,
+        ChatHttpGuard,
         {
           provide: AuthIntegrationPort,
           useValue: authIntegrationPort,
@@ -21,7 +21,7 @@ describe('UserHttpGuard', () => {
       ],
     }).compile();
 
-    guard = module.get<UserHttpGuard>(UserHttpGuard);
+    guard = module.get<ChatHttpGuard>(ChatHttpGuard);
   });
 
   it('should be defined', () => {
