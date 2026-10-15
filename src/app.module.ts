@@ -8,13 +8,14 @@ import { wsConfig } from '@infrastructure/websocket/ws.config';
 import { RedisModule } from '@infrastructure/redis/redis.module';
 import { DatabaseModule } from '@infrastructure/database/database.module';
 import { DatabaseType } from '@infrastructure/database/database-type.enum';
+import { platformApiConfig } from '@infrastructure/platform-api/platform-api.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
-      load: [appConfig, httpConfig, wsConfig],
+      load: [appConfig, httpConfig, wsConfig, platformApiConfig],
       cache: true,
     }),
     DatabaseModule.register(DatabaseType.POSTGRES),

@@ -5,8 +5,6 @@ import * as fs from 'fs';
 const authConfigSchema = z.object({
   accessPublicKey: z.string().min(1),
   accessPrivateKey: z.string().min(1),
-  refreshPublicKey: z.string().min(1),
-  refreshPrivateKey: z.string().min(1),
 });
 
 export const authConfig = registerAs('auth', () => {
@@ -18,14 +16,6 @@ export const authConfig = registerAs('auth', () => {
       ),
       accessPrivateKey: fs.readFileSync(
         process.env.AUTH_ACCESS_PRIVATE_KEY_PATH as string,
-        'utf8',
-      ),
-      refreshPublicKey: fs.readFileSync(
-        process.env.AUTH_REFRESH_PUBLIC_KEY_PATH as string,
-        'utf8',
-      ),
-      refreshPrivateKey: fs.readFileSync(
-        process.env.AUTH_REFRESH_PRIVATE_KEY_PATH as string,
         'utf8',
       ),
     });

@@ -156,6 +156,7 @@ export class ChatWsGateway
         [`user-${targetUser.id}`],
         new ConversationCreatedEvent({
           id: createMessage.conversationId,
+          avatarIndex: currentUser.avatarIndex,
           avatar: currentUser.avatar,
           username: currentUser.username,
           notSeenCount: 1,
@@ -179,6 +180,7 @@ export class ChatWsGateway
       [`user-${currentUser.id}`],
       new ConversationCreatedEvent({
         id: createMessage.conversationId,
+        avatarIndex: currentUser.avatarIndex,
         avatar: targetUser.avatar,
         username: targetUser.username,
         notSeenCount: 0,
@@ -200,6 +202,7 @@ export class ChatWsGateway
       id: createConversation.id,
       username: targetUser.username,
       createdAt: createMessage.createdAt.toISOString(),
+      avatarIndex: targetUser.avatarIndex,
       avatar: targetUser.avatar,
       chat: {
         id: createMessage.id,
@@ -271,9 +274,9 @@ export class ChatWsGateway
 
         const conversation: UserConversationListItem = {
           id: item.id,
-          title: item.title,
-          picture: item.picture,
           identifier: item.identifier,
+          identifierAvatarIndex: item.avatarIndex,
+          identifierAvatar: item.avatar,
           lastMessage: null,
           notSeenCount: item?.notSeenCount ?? 0,
         };
@@ -281,9 +284,9 @@ export class ChatWsGateway
         if (isDirect && otherMember) {
           const otherUser = usersById.get(otherMember.userId);
           if (otherUser) {
-            conversation.title = otherUser.username;
             conversation.identifier = otherUser.username;
-            conversation.picture = otherUser.avatar;
+            conversation.identifierAvatarIndex = otherUser.avatarIndex;
+            conversation.identifierAvatar = otherUser.avatar;
           }
         }
 
@@ -416,20 +419,13 @@ export class ChatWsGateway
 
     return {
       id: conversation.id,
-      avatar:
-        conversation.type == ConversationType.DIRECT
-          ? users.find((m) => m.id != authUserId)?.avatar
-          : conversation.title,
-      username:
-        conversation.type == ConversationType.DIRECT
-          ? users.find((m) => m.id != authUserId)?.username
-          : conversation.identifier,
       members: users
         .filter((user) => user.id != authUserId)
         .map((m) => ({
           id: m.id,
-          avatar: m.avatar,
           username: m.username,
+          avatarIndex: m.avatarIndex,
+          avatar: m.avatar,
           isBlocked: blockedUserIds.includes(m.id),
         })),
       messages: {

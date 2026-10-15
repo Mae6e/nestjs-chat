@@ -33,9 +33,9 @@ export class UserConversationListItemMessage {
 
 export class UserConversationListItem {
   id: string;
-  title: string;
-  picture: string;
   identifier: string;
+  identifierAvatarIndex: number;
+  identifierAvatar?: string;
   notSeenCount: number;
   lastMessage: UserConversationListItemMessage;
 }

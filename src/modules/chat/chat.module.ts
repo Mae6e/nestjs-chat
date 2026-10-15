@@ -16,6 +16,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { authConfig } from '@infrastructure/config/auth.config';
 import { ChatHttpGuard } from './presentation/http/guards/chat-http.guard';
+import { PlatformApiModule } from '@infrastructure/platform-api/platform-api.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ChatHttpGuard } from './presentation/http/guards/chat-http.guard';
         clockTolerance: 15,
       },
     }),
+    PlatformApiModule,
   ],
   providers: [
     ChatWsGateway,

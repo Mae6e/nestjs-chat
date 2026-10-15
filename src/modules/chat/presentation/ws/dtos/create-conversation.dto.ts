@@ -32,7 +32,8 @@ export class CreateConversationMessage {
 export class CreateConversationResponse {
   id: string;
   name: string;
-  avatar: string;
+  avatarIndex: number;
+  avatar?: string;
   username: string;
   createdAt: string;
   chat?: CreateConversationMessage;

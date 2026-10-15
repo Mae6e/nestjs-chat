@@ -25,9 +25,11 @@
     "migration:generate": "yarn build && yarn typeorm migration:generate",
     "migration:generate:chat": "yarn build && typeorm-ts-node-commonjs migration:generate -d src/modules/chat/infrastructure/database/postgres/chat-data-source.ts src/modules/chat/infrastructure/database/postgres/migrations/Initial",
     "migration:run": "yarn build && yarn typeorm migration:run",
-    "migration:revert": "yarn typeorm migration:revert"
+    "migration:revert": "yarn typeorm migration:revert",
+    "generate:key" : "make keys"
   },
   "dependencies": {
+    "@nestjs/axios": "^12.0.1",
     "@nestjs/common": "^11.1.27",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.27",
@@ -39,6 +41,7 @@
     "@nestjs/typeorm": "^11.0.3",
     "@nestjs/websockets": "^11.1.27",
     "@socket.io/redis-adapter": "^8.3.0",
+    "axios": "^1.20.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

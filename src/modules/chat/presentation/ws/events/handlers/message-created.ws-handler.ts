@@ -91,13 +91,12 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
           user: {
             id: currentUser.id,
             username: currentUser.username,
+            avatarIndex: currentUser.avatarIndex,
             avatar: currentUser.avatar,
           },
           content: event.text,
           conversation: {
             id: conversationDto.id,
-            avatar: currentUser.avatar,
-            username: currentUser.username,
           },
         }),
       );

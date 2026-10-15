@@ -17,12 +17,11 @@ export class UserMessageCreated {
 
 export class UserMessageCreatedConversation {
   id: string;
-  username: string;
-  avatar: string;
 }
 
 export class UserMessageCreatedUser {
   id: string;
   username: string;
-  avatar: string;
+  avatarIndex: number;
+  avatar?: string;
 }
