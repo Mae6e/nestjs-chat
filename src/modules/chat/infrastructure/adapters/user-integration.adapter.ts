@@ -1,4 +1,4 @@
-import { Body, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   BlockStatus,
   UserIntegrationPort,
@@ -16,12 +16,13 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
   ) {}
 
   async doesUserExist(id: string): Promise<boolean> {
-    const response: boolean = await this.client.get(`${id}/exists`);
-    return response;
+    const response: { data: boolean } = await this.client.get(`${id}/exists`);
+    return response.data;
   }
 
   async getUserById(id: string): Promise<any | null> {
-    return null;
+    const response: { data: any } = await this.client.get(`${id}`);
+    return response.data;
   }
 
   async getUserIdsByNameOrUsername(username: string): Promise<any | null> {
@@ -29,9 +30,10 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
   }
 
   async getUsersByIds(userIds: string[]): Promise<any[]> {
-    return await this.client.post(`batch`, {
+    const response: { data: any[] } = await this.client.post(`batch`, {
       ids: userIds,
     });
+    return response.data;
   }
 
   async hasBlockRelation(userA: string, userB: string): Promise<boolean> {

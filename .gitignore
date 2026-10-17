@@ -38,9 +38,6 @@ lerna-debug.log*
 # Envirnment files
 **/.env
 
-# Directory for the project keys
-keys/
-
 # Yarn
 .pnp.*
 .yarn/*

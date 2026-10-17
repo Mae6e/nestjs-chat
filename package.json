@@ -26,7 +26,7 @@
     "migration:generate:chat": "yarn build && typeorm-ts-node-commonjs migration:generate -d src/modules/chat/infrastructure/database/postgres/chat-data-source.ts src/modules/chat/infrastructure/database/postgres/migrations/Initial",
     "migration:run": "yarn build && yarn typeorm migration:run",
     "migration:revert": "yarn typeorm migration:revert",
-    "generate:key" : "make keys"
+    "generate:key" : "make generate_keys"
   },
   "dependencies": {
     "@nestjs/axios": "^12.0.1",
