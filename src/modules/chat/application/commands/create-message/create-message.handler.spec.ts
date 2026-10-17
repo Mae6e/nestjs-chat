@@ -4,7 +4,7 @@ import { ConversationRepositoryPort } from '@modules/chat/application/ports/conv
 import { EventPublisher } from '@nestjs/cqrs';
 import { CreateMessageCommand } from './create-message.command';
 import { MessageType } from '@modules/chat/domain/enums/chat-type.enum';
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 
 describe('CreateMessageHandler', () => {
   let handler: CreateMessageHandler;

@@ -33,4 +33,14 @@ export abstract class ConversationReadRepositoryPort {
     userId: string,
     pagination: PaginationOptions,
   ): Promise<PaginatedResult<MessageReadDto>>;
+
+  abstract getBlockStatus(
+    userId: string,
+    targetUserId: string,
+  ): Promise<boolean>;
+
+  abstract getBlockedUserIds(
+    userId: string,
+    targetUserIds: string[],
+  ): Promise<string[]>;
 }

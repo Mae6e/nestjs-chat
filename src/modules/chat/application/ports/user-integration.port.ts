@@ -1,9 +1,8 @@
 export interface ChatUser {
   id: string;
   username: string;
-  firstName: string;
-  lastName: string;
-  avatar: string;
+  avatarIndex: number;
+  avatar?: string;
 }
 
 export interface BlockStatus {

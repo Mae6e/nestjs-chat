@@ -2,7 +2,7 @@ import { CommandHandler, EventPublisher, ICommandHandler } from '@nestjs/cqrs';
 import { CreateMessageCommand } from './create-message.command';
 import { Logger } from '@nestjs/common';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { WsException } from '@nestjs/websockets';
 
 @CommandHandler(CreateMessageCommand)

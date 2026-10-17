@@ -23,7 +23,7 @@ export class ConversationMember {
   @PrimaryColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'char', length: 24 })
   @Index('conversation_members_user_id_idx')
   user_id: string;
 

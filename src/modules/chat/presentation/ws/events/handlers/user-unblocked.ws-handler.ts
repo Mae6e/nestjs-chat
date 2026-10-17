@@ -1,6 +1,6 @@
 import { EventsHandler, IEventHandler } from '@nestjs/cqrs';
 import { Logger } from '@nestjs/common';
-import { UserUnblockedEvent } from '@modules/user/contracts/events';
+import { UserUnblockedEvent } from '@modules/chat/contracts/events';
 import { ChatWsGateway } from '@modules/chat/presentation/ws/chat-ws.gateway';
 import { UserUnblockedWsEvent } from '@modules/chat/presentation/ws/events/user-unblocked.event';
 

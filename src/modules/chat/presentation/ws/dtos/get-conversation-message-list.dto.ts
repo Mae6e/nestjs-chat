@@ -35,6 +35,7 @@ export class UserConversationMessageList {
 export class UserConversationMessageMember {
   id: string;
   name: string;
+  avatarIndex: number;
   avatar?: string;
   username?: string;
   isBlocked: boolean;
@@ -43,6 +44,7 @@ export class UserConversationMessageMember {
 export class GetConversationMessageListResponse {
   id: string;
   name?: string;
+  avatarIndex: number;
   avatar?: string;
   username?: string;
   members: Partial<UserConversationMessageMember>[];

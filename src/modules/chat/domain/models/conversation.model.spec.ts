@@ -1,7 +1,7 @@
 import { ConversationEntity } from './conversation.model';
 import { ConversationType } from '../enums/conversation-type.enum';
 import { ConversationMemberEntity } from './conversation-member.model';
-import { MessageEntity } from './message.entity';
+import { MessageEntity } from './message.model';
 import { MessageType } from '../enums/chat-type.enum';
 
 describe('ConversationEntity', () => {

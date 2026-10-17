@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserBlockedWsEventHandler } from './user-blocked.ws-handler';
 import { ChatWsGateway } from '@modules/chat/presentation/ws/chat-ws.gateway';
-import { UserBlockedEvent } from '@modules/user/contracts/events';
+import { UserBlockedEvent } from '@modules/chat/contracts/events';
 
 describe('UserBlockedWsEventHandler', () => {
   let handler: UserBlockedWsEventHandler;

@@ -11,6 +11,8 @@ import { GetUserConversationIdsOptions } from '@modules/chat/application/ports/o
 import { GetUserConversationListOptions } from '@modules/chat/application/ports/options/get-user-conversation-list.options';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
+import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
+
 import {
   PaginatedResult,
   PaginationOptions,
@@ -26,6 +28,8 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(ConversationMember, DatabaseType.POSTGRES)
     private readonly conversationMemberRepository: Repository<ConversationMember>,
+    @InjectRepository(UserBlock, DatabaseType.POSTGRES)
+    private readonly userBlockRepository: Repository<UserBlock>,
     @InjectDataSource(DatabaseType.POSTGRES)
     private readonly dataSource: DataSource,
   ) {}
@@ -315,5 +319,33 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     }));
 
     return PaginationHelper.createResult(dtos, count, pagination);
+  }
+
+  async getBlockStatus(blockerId: string, blockedId: string): Promise<boolean> {
+    const res = await this.userBlockRepository
+      .createQueryBuilder('ub')
+      .where('blocker_id = :blockerId', { blockerId })
+      .andWhere('blocked_id = :blockedId', { blockedId })
+      .getExists();
+
+    return res;
+  }
+
+  async getBlockedUserIds(
+    blockerId: string,
+    blockedIds?: string[],
+  ): Promise<string[]> {
+    const query = this.userBlockRepository
+      .createQueryBuilder('ub')
+      .select('blocked_id', 'blockedId')
+      .where('blocker_id = :userId', { userId: blockerId }); // Fixed variable interpolation
+
+    if (blockedIds?.length) {
+      query.andWhere('blocked_id IN (:...blockedIds)', { blockedIds }); // Fixed s
+    }
+
+    const res = await query.getRawMany<{ blockedId: string }>();
+
+    return res.map((r) => r.blockedId);
   }
 }

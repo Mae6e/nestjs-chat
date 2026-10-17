@@ -108,10 +108,17 @@ export class ChatWsGateway
     @MessageBody() data: CreateConversationRequest,
     @CurrentUserId() authUserId: string,
   ): Promise<any> {
-    const [currentUser, targetUser] = await Promise.all([
-      this.userIntegrationPort.getUserById(authUserId),
-      this.userIntegrationPort.getUserById(data.targetUserId),
+    const users = await this.userIntegrationPort.getUsersByIds([
+      authUserId,
+      data.targetUserId,
     ]);
+
+    const currentUser = users.find((u) => u.id === authUserId);
+    const targetUser = users.find((u) => u.id === data.targetUserId);
+
+    if (!currentUser || !targetUser) {
+      throw new WsException('User not found.');
+    }
 
     const blockStatus = await this.userIntegrationPort.getBlockStatus(
       authUserId,
@@ -149,7 +156,7 @@ export class ChatWsGateway
         [`user-${targetUser.id}`],
         new ConversationCreatedEvent({
           id: createMessage.conversationId,
-          name: `${currentUser.firstName} ${currentUser.lastName}`,
+          avatarIndex: currentUser.avatarIndex,
           avatar: currentUser.avatar,
           username: currentUser.username,
           notSeenCount: 1,
@@ -160,7 +167,7 @@ export class ChatWsGateway
             seen: false,
             user: {
               id: currentUser.id,
-              name: `${currentUser.firstName} ${currentUser.lastName}`,
+              username: currentUser.username,
             },
           },
         }),
@@ -173,7 +180,7 @@ export class ChatWsGateway
       [`user-${currentUser.id}`],
       new ConversationCreatedEvent({
         id: createMessage.conversationId,
-        name: `${targetUser.firstName} ${targetUser.lastName}`,
+        avatarIndex: currentUser.avatarIndex,
         avatar: targetUser.avatar,
         username: targetUser.username,
         notSeenCount: 0,
@@ -184,18 +191,19 @@ export class ChatWsGateway
           seen: true,
           user: {
             id: currentUser.id,
-            name: `${currentUser.firstName} ${currentUser.lastName}`,
+            username: currentUser.username,
           },
         },
       }),
     );
 
+    //? ack message
     return {
       id: createConversation.id,
-      username: createConversation.identifier,
+      username: targetUser.username,
       createdAt: createMessage.createdAt.toISOString(),
-      avatar: createConversation.picture,
-      name: `${targetUser.firstName} ${targetUser.lastName}`,
+      avatarIndex: targetUser.avatarIndex,
+      avatar: targetUser.avatar,
       chat: {
         id: createMessage.id,
         createdAt: createMessage.createdAt.toISOString(),
@@ -203,7 +211,7 @@ export class ChatWsGateway
         content: createMessage.text,
         user: {
           id: currentUser.id,
-          name: `${currentUser.firstName} ${currentUser.lastName}`,
+          username: currentUser.username,
         },
       },
     };
@@ -266,9 +274,9 @@ export class ChatWsGateway
 
         const conversation: UserConversationListItem = {
           id: item.id,
-          title: item.title,
-          picture: item.picture,
           identifier: item.identifier,
+          identifierAvatarIndex: item.avatarIndex,
+          identifierAvatar: item.avatar,
           lastMessage: null,
           notSeenCount: item?.notSeenCount ?? 0,
         };
@@ -276,9 +284,9 @@ export class ChatWsGateway
         if (isDirect && otherMember) {
           const otherUser = usersById.get(otherMember.userId);
           if (otherUser) {
-            conversation.title = `${otherUser.firstName} ${otherUser.lastName}`;
             conversation.identifier = otherUser.username;
-            conversation.picture = otherUser.avatar;
+            conversation.identifierAvatarIndex = otherUser.avatarIndex;
+            conversation.identifierAvatar = otherUser.avatar;
           }
         }
 
@@ -299,7 +307,6 @@ export class ChatWsGateway
               ? {
                   id: sender.id,
                   username: sender.username,
-                  name: `${sender.firstName} ${sender.lastName}`,
                 }
               : null,
           };
@@ -326,11 +333,23 @@ export class ChatWsGateway
       throw new WsException('Conversation not found');
     }
 
-    const [currentUser, targetUser, blockStatus] = await Promise.all([
-      this.userIntegrationPort.getUserById(authUserId),
-      this.userIntegrationPort.getUserById(targetMember.userId),
-      this.userIntegrationPort.getBlockStatus(authUserId, targetMember.userId),
+    const users = await this.userIntegrationPort.getUsersByIds([
+      authUserId,
+      targetMember.userId,
     ]);
+
+    const currentUser = users.find((u) => u.id === authUserId);
+    const targetUser = users.find((u) => u.id === targetMember.userId);
+
+    if (!currentUser || !targetUser) {
+      throw new WsException('User not found.');
+    }
+
+    const blockStatus = await this.userIntegrationPort.getBlockStatus(
+      authUserId,
+      targetMember.userId,
+    );
+
     if (blockStatus.isBlocker) {
       throw new WsException(
         'You need to unblock the user before sending a message.',
@@ -353,7 +372,7 @@ export class ChatWsGateway
       seen: false,
       user: {
         id: currentUser.id,
-        name: `${currentUser.firstName} ${currentUser.lastName}`,
+        username: currentUser.username,
       },
       content: createMessage.text,
     };
@@ -400,25 +419,13 @@ export class ChatWsGateway
 
     return {
       id: conversation.id,
-      name:
-        conversation.type == ConversationType.DIRECT
-          ? users.find((m) => m.id != authUserId)?.firstName
-          : conversation.title,
-      avatar:
-        conversation.type == ConversationType.DIRECT
-          ? users.find((m) => m.id != authUserId)?.avatar
-          : conversation.title,
-      username:
-        conversation.type == ConversationType.DIRECT
-          ? users.find((m) => m.id != authUserId)?.username
-          : conversation.identifier,
       members: users
         .filter((user) => user.id != authUserId)
         .map((m) => ({
           id: m.id,
-          avatar: m.avatar,
           username: m.username,
-          name: m.firstName,
+          avatarIndex: m.avatarIndex,
+          avatar: m.avatar,
           isBlocked: blockedUserIds.includes(m.id),
         })),
       messages: {
@@ -438,7 +445,7 @@ export class ChatWsGateway
             user: user
               ? {
                   id: user.id,
-                  name: user.firstName,
+                  username: user.username,
                 }
               : null,
           };

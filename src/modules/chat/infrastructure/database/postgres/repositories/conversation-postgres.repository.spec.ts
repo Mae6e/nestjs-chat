@@ -5,7 +5,7 @@ import { DatabaseType } from '@infrastructure/database/database-type.enum';
 import { Conversation } from '../entities/conversation.entity';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { MessageType } from '@modules/chat/domain/enums/chat-type.enum';
 
 describe('ConversationPostgresRepository', () => {
@@ -129,6 +129,49 @@ describe('ConversationPostgresRepository', () => {
       queryBuilderMock.execute.mockResolvedValue({ affected: 1 });
       const result = await repository.deleteConversation('conv-1');
       expect(result).toBe(true);
+    });
+  });
+
+  describe('block', () => {
+    it('should return false if already blocked', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(true);
+      const result = await repository.block('blocker', 'blocked');
+      expect(result).toBe(false);
+    });
+
+    it('should insert block and return true if not blocked', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(false);
+      const result = await repository.block('blocker', 'blocked');
+      expect(repoMock.insert).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('unblock', () => {
+    it('should execute soft delete and return true if affected', async () => {
+      queryBuilderMock.execute.mockResolvedValue({ affected: 1 });
+      const result = await repository.unblock('blocker', 'blocked');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getBlockStatus', () => {
+    it('should return true if blocked', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(true);
+      const result = await repository.getBlockStatus('blocker', 'blocked');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getBlockedUserIds', () => {
+    it('should return array of blocked ids', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([
+        { blockedId: 'blocked-1' },
+      ]);
+      const result = await repository.getBlockedUserIds('blocker', [
+        'blocked-1',
+      ]);
+      expect(result).toEqual(['blocked-1']);
     });
   });
 });

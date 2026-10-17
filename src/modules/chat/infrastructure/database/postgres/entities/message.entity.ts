@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { MessageType } from '@modules/chat/domain/enums/chat-type.enum';
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
-import { MessageEntity } from '@modules/chat/domain/models/message.entity';
+import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
 
 @Entity({ schema: 'chat', name: 'messages' })

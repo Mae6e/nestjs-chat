@@ -21,7 +21,6 @@ export class GetUserConversationListRequest {
 export class UserConversationListItemMessageUser {
   id: string;
   username: string;
-  name: string;
 }
 
 export class UserConversationListItemMessage {
@@ -34,9 +33,9 @@ export class UserConversationListItemMessage {
 
 export class UserConversationListItem {
   id: string;
-  title: string;
-  picture: string;
   identifier: string;
+  identifierAvatarIndex: number;
+  identifierAvatar?: string;
   notSeenCount: number;
   lastMessage: UserConversationListItemMessage;
 }
