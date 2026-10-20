@@ -49,7 +49,7 @@ describe('CreateMessageHandler', () => {
     commandRepo.saveMessage.mockImplementation(async (msg) => msg);
     commandRepo.getConversationById.mockResolvedValue({
       id: 'conv-1',
-      members: [{ id: 'member-1', userId: 'sender-1' }],
+      members: [{ id: 'member-1', userId: 'sender-1', isActive: () => true }],
     } as any);
 
     const result = await handler.execute(command);

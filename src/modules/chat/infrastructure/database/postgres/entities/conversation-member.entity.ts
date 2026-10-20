@@ -12,6 +12,8 @@ import {
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
 import { Message } from '@modules/chat/infrastructure/database/postgres/entities/message.entity';
 import { ConversationMemberEntity } from '@modules/chat/domain/models/conversation-member.model';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 @Entity({ schema: 'chat', name: 'conversation_members' })
 @Index(
@@ -26,6 +28,21 @@ export class ConversationMember {
   @Column({ type: 'char', length: 24 })
   @Index('conversation_members_user_id_idx')
   user_id: string;
+
+  @Column({
+    type: 'enum',
+    enum: ConversationMemberRole,
+    default: ConversationMemberRole.USER,
+  })
+  role: ConversationMemberRole;
+
+  @Column({
+    type: 'enum',
+    enum: ConversationMemberStatus,
+    default: ConversationMemberStatus.ACTIVE,
+  })
+  @Index('conversation_members_status_idx')
+  status: ConversationMemberStatus;
 
   @Column({ type: 'uuid' })
   conversation_id: string;
@@ -72,6 +89,8 @@ export class ConversationMember {
     const conversationMember = new ConversationMember();
     conversationMember.id = entity.id;
     conversationMember.user_id = entity.userId;
+    conversationMember.role = entity.role;
+    conversationMember.status = entity.status;
     conversationMember.conversation_id = entity.conversationId;
     conversationMember.last_seen_message_id = entity.lastSeenMessageId;
     conversationMember.last_message_id = entity.lastMessageId;
@@ -90,6 +109,8 @@ export class ConversationMember {
     const entity = ConversationMemberEntity.reconstruct(
       conversationMember.id,
       conversationMember.user_id,
+      conversationMember.role,
+      conversationMember.status,
       conversationMember.conversation_id,
       conversationMember.last_seen_message_id,
       conversationMember.last_message_id,

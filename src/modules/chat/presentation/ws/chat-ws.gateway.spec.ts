@@ -8,6 +8,8 @@ import { AuthIntegrationPort } from '@modules/chat/application/ports/auth-integr
 import { WsException } from '@nestjs/websockets';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { DeleteConversationCommand } from '@modules/chat/application/commands/delete-conversation/delete-conversation.command';
+import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
+import { FileStoragePort } from '@modules/chat/application/ports/file-storage.port';
 
 describe('ChatWsGateway', () => {
   let gateway: ChatWsGateway;
@@ -31,6 +33,21 @@ describe('ChatWsGateway', () => {
       getUsersByIds: jest.fn(),
       getBlockedUsersIds: jest.fn(),
     } as unknown as jest.Mocked<UserIntegrationPort>;
+    const conversationRepository = {
+      getConversationById: jest.fn(),
+    } as unknown as jest.Mocked<ConversationRepositoryPort>;
+    const fileStorage = {
+      saveGroupPicture: jest.fn(),
+      deleteGroupPicture: jest.fn(),
+      getGroupPictureUrl: jest.fn((picture: string | null) =>
+        picture
+          ? picture.startsWith('/')
+            ? picture
+            : `/uploads/group-pictures/${picture}`
+          : null,
+      ),
+      normalizeGroupPictureKey: jest.fn((picture: string) => picture),
+    } as unknown as jest.Mocked<FileStoragePort>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +56,11 @@ describe('ChatWsGateway', () => {
         { provide: CommandBus, useValue: commandBus },
         { provide: QueryBus, useValue: queryBus },
         { provide: UserIntegrationPort, useValue: userIntegrationPort },
+        {
+          provide: ConversationRepositoryPort,
+          useValue: conversationRepository,
+        },
+        { provide: FileStoragePort, useValue: fileStorage },
         { provide: AuthIntegrationPort, useValue: {} },
       ],
     })
@@ -62,12 +84,10 @@ describe('ChatWsGateway', () => {
 
   describe('createDirectConversation', () => {
     it('should throw if target user is blocked', async () => {
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-1',
-      } as any);
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-2',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: true,
         isBlocked: false,
@@ -83,18 +103,20 @@ describe('ChatWsGateway', () => {
     });
 
     it('should create conversation, broadcast, and return result', async () => {
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-1',
-        firstName: 'John',
-        lastName: 'Doe',
-        username: 'johndoe',
-      } as any);
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-2',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        username: 'janesmith',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        {
+          id: 'user-1',
+          firstName: 'John',
+          lastName: 'Doe',
+          username: 'johndoe',
+        },
+        {
+          id: 'user-2',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          username: 'janesmith',
+        },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
         isBlocked: false,
@@ -121,9 +143,10 @@ describe('ChatWsGateway', () => {
     });
 
     it('should rollback conversation if message creation fails', async () => {
-      userIntegrationPort.getUserById.mockResolvedValue({
-        id: 'user-1',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
         isBlocked: false,
@@ -183,7 +206,6 @@ describe('ChatWsGateway', () => {
         'user-1',
       );
       expect(result.data[0].id).toBe('conv-1');
-      expect(result.data[0].title).toBe('Jane Smith');
       expect(result.data[0].identifier).toBe('janes');
     });
 
@@ -218,11 +240,13 @@ describe('ChatWsGateway', () => {
     it('should throw if target is blocked', async () => {
       queryBus.execute.mockResolvedValue({
         id: 'conv-1',
+        type: ConversationType.DIRECT,
         members: [{ userId: 'user-1' }, { userId: 'user-2' }],
       });
-      userIntegrationPort.getUserById.mockResolvedValue({
-        id: 'user-1',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: true,
         isBlocked: false,
@@ -240,12 +264,13 @@ describe('ChatWsGateway', () => {
     it('should create message', async () => {
       queryBus.execute.mockResolvedValue({
         id: 'conv-1',
+        type: ConversationType.DIRECT,
         members: [{ userId: 'user-1' }, { userId: 'user-2' }],
       });
-      userIntegrationPort.getUserById.mockResolvedValue({
-        id: 'user-1',
-        firstName: 'J',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1', firstName: 'J', username: 'user1' },
+        { id: 'user-2', firstName: 'M', username: 'user2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
         isBlocked: false,
@@ -268,6 +293,7 @@ describe('ChatWsGateway', () => {
     it('should throw if conversation missing target member', async () => {
       queryBus.execute.mockResolvedValue({
         id: 'conv-1',
+        type: ConversationType.DIRECT,
         members: [{ userId: 'user-1' }],
       });
       await expect(

@@ -37,6 +37,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       return httpAdapter.reply(
         ctx.getResponse(),
         {
+          data: null,
           statusCode: httpStatus,
           message: message,
           error: code,
@@ -47,9 +48,19 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
 
     // Let standard NestJS HTTP exceptions pass through naturally
     if (exception instanceof HttpException) {
+      const response = exception.getResponse();
+      const body =
+        typeof response === 'string'
+          ? { message: response }
+          : (response as Record<string, unknown>);
+
       return httpAdapter.reply(
         ctx.getResponse(),
-        exception.getResponse(),
+        {
+          statusCode: exception.getStatus(),
+          ...body,
+          data: null,
+        },
         exception.getStatus(),
       );
     }
@@ -63,6 +74,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     httpAdapter.reply(
       ctx.getResponse(),
       {
+        data: null,
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Internal server error',
       },

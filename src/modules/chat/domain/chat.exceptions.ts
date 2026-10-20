@@ -46,6 +46,74 @@ export class ConversationNotFoundException extends DomainException {
   }
 }
 
+export class NotAGroupConversationException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Conversation is not a group: ${reason}`
+        : 'Conversation is not a group',
+      'CHAT_NOT_A_GROUP',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupAdminRequiredException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Admin privileges required: ${reason}`
+        : 'Only group admins can perform this action',
+      'CHAT_GROUP_ADMIN_REQUIRED',
+      'FORBIDDEN',
+    );
+  }
+}
+
+export class GroupMemberAlreadyExistsException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `User is already a member of the group: ${reason}`
+        : 'User is already a member of the group',
+      'CHAT_GROUP_MEMBER_ALREADY_EXISTS',
+      'CONFLICT',
+    );
+  }
+}
+
+export class GroupMemberNotFoundException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason ? `Group member not found: ${reason}` : 'Group member not found',
+      'CHAT_GROUP_MEMBER_NOT_FOUND',
+      'NOT_FOUND',
+    );
+  }
+}
+
+export class GroupJoinRequestNotFoundException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason ? `Join request not found: ${reason}` : 'Join request not found',
+      'CHAT_GROUP_JOIN_REQUEST_NOT_FOUND',
+      'NOT_FOUND',
+    );
+  }
+}
+
+export class LastGroupAdminException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group must keep at least one admin: ${reason}`
+        : 'Group must keep at least one admin',
+      'CHAT_GROUP_LAST_ADMIN',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
 export class ChatDomainError extends DomainException {
   constructor(message: string) {
     super(message, 'CHAT_DOMAIN_ERROR', 'BUSINESS_RULE');

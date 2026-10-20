@@ -1,9 +1,20 @@
 import { CreateDirectConversationCommand } from '@modules/chat/application/commands/create-direct-conversation/create-direct-conversation.command';
 import { CreateMessageCommand } from '@modules/chat/application/commands/create-message/create-message.command';
 import { DeleteConversationCommand } from '@modules/chat/application/commands/delete-conversation/delete-conversation.command';
+import { RequestJoinGroupCommand } from '@modules/chat/application/commands/request-join-group/request-join-group.command';
+import {
+  GroupJoinRequestAction,
+  RespondToJoinRequestCommand,
+} from '@modules/chat/application/commands/respond-to-join-request/respond-to-join-request.command';
+import { AddGroupMembersCommand } from '@modules/chat/application/commands/add-group-members/add-group-members.command';
+import { RemoveGroupMemberCommand } from '@modules/chat/application/commands/remove-group-member/remove-group-member.command';
+import { ChangeGroupMemberRoleCommand } from '@modules/chat/application/commands/change-group-member-role/change-group-member-role.command';
+import { LeaveGroupCommand } from '@modules/chat/application/commands/leave-group/leave-group.command';
 import { GetUserConversationListQuery } from '@modules/chat/application/queries/get-user-conversation-list/get-user-conversation-list.query';
 import { GetUserConversationQuery } from '@modules/chat/application/queries/get-user-conversation/get-user-conversation.query';
 import { GetUserConversationMessageListQuery } from '@modules/chat/application/queries/get-user-conversation-message-list/get-user-conversation-message-list.query';
+import { GetGroupMembersQuery } from '@modules/chat/application/queries/get-group-members/get-group-members.query';
+import { GetGroupJoinRequestsQuery } from '@modules/chat/application/queries/get-group-join-requests/get-group-join-requests.query';
 import {
   ConnectedSocket,
   MessageBody,
@@ -27,6 +38,7 @@ import { PaginationHelper } from '@common/pagination/pagination.helper';
 import { UserIntegrationPort } from '@modules/chat/application/ports/user-integration.port';
 import { CurrentUserId } from '@common/decorators/current-user-id.decorator';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 import { CreateConversationRequest } from '@modules/chat/presentation/ws/dtos/create-conversation.dto';
 import { MessageType } from '@modules/chat/domain/enums/chat-type.enum';
 import { BaseWsGateway } from '@common/websocket/base-ws.gateway';
@@ -37,6 +49,25 @@ import { GetConversationMessageListRequest } from '@modules/chat/presentation/ws
 import { MessageSeenEvent } from '@modules/chat/presentation/ws/events/message-seen.event';
 import { MarkMessageSeenRequest } from '@modules/chat/presentation/ws/dtos/mark-message-seen.dto';
 import { GlobalWsExceptionFilter } from '@common/websocket/filters/global-ws-exception.filter';
+import {
+  AddGroupMembersRequest,
+  ChangeGroupMemberRoleRequest,
+  GetGroupJoinRequestsRequest,
+  GroupConversationRequest,
+  GroupJoinResponseRequest,
+} from '@modules/chat/presentation/ws/dtos/group-conversation.dto';
+import {
+  GroupJoinApprovedEvent,
+  GroupJoinRejectedEvent,
+  GroupJoinRequestedEvent,
+  GroupLeftEvent,
+  GroupMemberAddedEvent,
+  GroupMemberRemovedEvent,
+  GroupMemberRoleChangedEvent,
+} from '@modules/chat/presentation/ws/events/group.events';
+import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
+import { FileStoragePort } from '@modules/chat/application/ports/file-storage.port';
+import { ChatUser } from '@modules/chat/application/ports/user-integration.port';
 
 @UseGuards(ChatWsGuard)
 @UseFilters(new GlobalWsExceptionFilter())
@@ -54,6 +85,8 @@ export class ChatWsGateway
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
     private readonly userIntegrationPort: UserIntegrationPort,
+    private readonly conversationRepository: ConversationRepositoryPort,
+    private readonly fileStorage: FileStoragePort,
   ) {
     super();
   }
@@ -257,7 +290,10 @@ export class ChatWsGateway
     allUsersInvolved.push(...conversationsUserIds);
     const uniqueUserIds = Array.from(new Set(allUsersInvolved)) as string[];
 
-    const users = await this.userIntegrationPort.getUsersByIds(uniqueUserIds);
+    const users =
+      uniqueUserIds.length > 0
+        ? await this.userIntegrationPort.getUsersByIds(uniqueUserIds)
+        : [];
     const usersById = new Map(users.map((u) => [u.id, u]));
 
     const isSeenBy = (member: any, messageCreatedAt: Date) =>
@@ -269,14 +305,20 @@ export class ChatWsGateway
       data: conversationList.data.map((item) => {
         const currentMember = item.members.find((m) => m.userId == authUserId);
 
-        const otherMember = item.members.find((m) => m.userId !== authUserId);
+        const otherMembers = item.members.filter(
+          (m) => m.userId !== authUserId,
+        );
+        const otherMember = otherMembers[0];
         const isDirect = item.type === ConversationType.DIRECT;
 
         const conversation: UserConversationListItem = {
           id: item.id,
+          type: item.type,
+          role: currentMember?.role ?? ConversationMemberRole.USER,
           identifier: item.identifier,
-          identifierAvatarIndex: item.avatarIndex,
-          identifierAvatar: item.avatar,
+          identifierAvatarIndex: 0,
+          identifierAvatar: undefined,
+          memberCount: item.members.length,
           lastMessage: null,
           notSeenCount: item?.notSeenCount ?? 0,
         };
@@ -288,6 +330,10 @@ export class ChatWsGateway
             conversation.identifierAvatarIndex = otherUser.avatarIndex;
             conversation.identifierAvatar = otherUser.avatar;
           }
+        } else if (!isDirect) {
+          conversation.identifier = item.title ?? item.identifier ?? '';
+          conversation.identifierAvatar =
+            this.fileStorage.getGroupPictureUrl(item.picture) ?? undefined;
         }
 
         if (item.lastMessage) {
@@ -295,7 +341,12 @@ export class ChatWsGateway
           const isOwn = item.lastMessage.senderId === authUserId;
 
           const seen = isOwn
-            ? isDirect && isSeenBy(otherMember, item.lastMessage.createdAt)
+            ? isDirect
+              ? isSeenBy(otherMember, item.lastMessage.createdAt)
+              : otherMembers.length > 0 &&
+                otherMembers.every((m) =>
+                  isSeenBy(m, item.lastMessage.createdAt),
+                )
             : isSeenBy(currentMember, item.lastMessage.createdAt);
 
           conversation.lastMessage = {
@@ -326,34 +377,51 @@ export class ChatWsGateway
       new GetUserConversationQuery(data.conversationId, authUserId),
     );
 
-    const targetMember = conversation.members.find(
-      (member) => member.userId !== authUserId,
-    );
-    if (!targetMember) {
-      throw new WsException('Conversation not found');
-    }
+    const isDirect = conversation.type === ConversationType.DIRECT;
 
-    const users = await this.userIntegrationPort.getUsersByIds([
-      authUserId,
-      targetMember.userId,
-    ]);
+    let currentUser: ChatUser;
+    let targetUser: ChatUser | undefined;
+    let deletedForUserIds: string[] = [];
 
-    const currentUser = users.find((u) => u.id === authUserId);
-    const targetUser = users.find((u) => u.id === targetMember.userId);
-
-    if (!currentUser || !targetUser) {
-      throw new WsException('User not found.');
-    }
-
-    const blockStatus = await this.userIntegrationPort.getBlockStatus(
-      authUserId,
-      targetMember.userId,
-    );
-
-    if (blockStatus.isBlocker) {
-      throw new WsException(
-        'You need to unblock the user before sending a message.',
+    if (isDirect) {
+      const targetMember = conversation.members.find(
+        (member) => member.userId !== authUserId,
       );
+      if (!targetMember) {
+        throw new WsException('Conversation not found');
+      }
+
+      const users = await this.userIntegrationPort.getUsersByIds([
+        authUserId,
+        targetMember.userId,
+      ]);
+
+      currentUser = users.find((u) => u.id === authUserId);
+      targetUser = users.find((u) => u.id === targetMember.userId);
+
+      if (!currentUser || !targetUser) {
+        throw new WsException('User not found.');
+      }
+
+      const blockStatus = await this.userIntegrationPort.getBlockStatus(
+        authUserId,
+        targetMember.userId,
+      );
+
+      if (blockStatus.isBlocker) {
+        throw new WsException(
+          'You need to unblock the user before sending a message.',
+        );
+      }
+
+      deletedForUserIds = blockStatus.isBlocked ? [targetUser.id] : [];
+    } else {
+      const users = await this.userIntegrationPort.getUsersByIds([authUserId]);
+      currentUser = users.find((u) => u.id === authUserId);
+
+      if (!currentUser) {
+        throw new WsException('User not found.');
+      }
     }
 
     const createMessage = await this.commandBus.execute(
@@ -362,12 +430,13 @@ export class ChatWsGateway
         MessageType.TEXT,
         authUserId,
         conversation.id,
-        blockStatus.isBlocked ? [targetUser.id] : [],
+        deletedForUserIds,
       ),
     );
 
     return {
       id: createMessage.id,
+      conversationId: conversation.id,
       createdAt: createMessage.createdAt.toISOString(),
       seen: false,
       user: {
@@ -409,16 +478,39 @@ export class ChatWsGateway
       users.map((user) => user.id),
     );
 
-    const otherMember = conversation.members.find(
+    const isDirect = conversation.type === ConversationType.DIRECT;
+    const otherMembers = conversation.members.filter(
       (m) => m.userId !== authUserId,
     );
-    const otherLastSeenAt = otherMember?.lastSeenMessage?.createdAt;
+    const otherMember = otherMembers[0];
 
     const me = conversation.members.find((m) => m.userId === authUserId);
     const myLastSeenAt = me?.lastSeenMessage?.createdAt;
 
+    const isSeenByEveryone = (createdAt: string | Date): boolean => {
+      if (isDirect) {
+        return (
+          !!otherMember?.lastSeenMessage &&
+          createdAt <= otherMember.lastSeenMessage.createdAt
+        );
+      }
+      return (
+        otherMembers.length > 0 &&
+        otherMembers.every(
+          (member) =>
+            !!member.lastSeenMessage &&
+            createdAt <= member.lastSeenMessage.createdAt,
+        )
+      );
+    };
+
     return {
       id: conversation.id,
+      type: conversation.type,
+      title: conversation.title ?? null,
+      picture: this.fileStorage.getGroupPictureUrl(conversation.picture),
+      updatedBy: conversation.updatedBy ?? null,
+      role: me?.role ?? ConversationMemberRole.USER,
       members: users
         .filter((user) => user.id != authUserId)
         .map((m) => ({
@@ -426,6 +518,7 @@ export class ChatWsGateway
           username: m.username,
           avatarIndex: m.avatarIndex,
           avatar: m.avatar,
+          role: conversation.members.find((cm) => cm.userId === m.id)?.role,
           isBlocked: blockedUserIds.includes(m.id),
         })),
       messages: {
@@ -435,13 +528,16 @@ export class ChatWsGateway
         list: messageList.data.map((item) => {
           const user = users.find((u) => u.id == item.senderId);
           const isOwn = item.senderId === authUserId;
-          const seenAt = isOwn ? otherLastSeenAt : myLastSeenAt;
+
+          const seen = isOwn
+            ? isSeenByEveryone(item.createdAt)
+            : !!myLastSeenAt && item.createdAt <= myLastSeenAt;
 
           const message = {
             id: item.id,
             content: item.text,
             createdAt: item.createdAt,
-            seen: !!seenAt && item.createdAt <= seenAt,
+            seen,
             user: user
               ? {
                   id: user.id,
@@ -494,5 +590,340 @@ export class ChatWsGateway
         messageId: data.messageId,
       }),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Group conversations
+  // ---------------------------------------------------------------------------
+
+  @SubscribeMessage('conversation.group.join')
+  async requestToJoinGroup(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: GroupConversationRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const member = await this.commandBus.execute(
+      new RequestJoinGroupCommand(data.conversationId, authUserId),
+    );
+
+    const conversation = await this.conversationRepository.getConversationById(
+      data.conversationId,
+    );
+
+    if (conversation) {
+      const adminRooms = conversation
+        .getAdmins()
+        .filter((admin) => admin.userId !== authUserId)
+        .map((admin) => `user-${admin.userId}`);
+
+      await this.broadcast(
+        client,
+        adminRooms,
+        new GroupJoinRequestedEvent({
+          conversationId: data.conversationId,
+          userId: authUserId,
+          requestedAt: new Date().toISOString(),
+        }),
+      );
+    }
+
+    return {
+      conversationId: data.conversationId,
+      userId: authUserId,
+      status: member.status,
+    };
+  }
+
+  @SubscribeMessage('conversation.group.join.requests')
+  async getGroupJoinRequests(
+    @MessageBody() data: GetGroupJoinRequestsRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const pagination = PaginationHelper.parse(data.page, data.pageSize);
+
+    const requests = await this.queryBus.execute(
+      new GetGroupJoinRequestsQuery(
+        data.conversationId,
+        authUserId,
+        pagination,
+      ),
+    );
+
+    const users = await this.userIntegrationPort.getUsersByIds(
+      requests.data.map((request) => request.userId),
+    );
+    const usersById = new Map(users.map((user) => [user.id, user]));
+
+    return {
+      meta: requests.meta,
+      data: requests.data.map((request) => {
+        const user = usersById.get(request.userId);
+        return {
+          id: request.id,
+          userId: request.userId,
+          username: user?.username,
+          avatarIndex: user?.avatarIndex,
+          avatar: user?.avatar,
+          role: request.role,
+          status: request.status,
+        };
+      }),
+    };
+  }
+
+  @SubscribeMessage('conversation.group.join.approve')
+  async approveGroupJoinRequest(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: GroupJoinResponseRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    return this.respondToGroupJoinRequest(
+      client,
+      data,
+      authUserId,
+      GroupJoinRequestAction.APPROVE,
+    );
+  }
+
+  @SubscribeMessage('conversation.group.join.reject')
+  async rejectGroupJoinRequest(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: GroupJoinResponseRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    return this.respondToGroupJoinRequest(
+      client,
+      data,
+      authUserId,
+      GroupJoinRequestAction.REJECT,
+    );
+  }
+
+  private async respondToGroupJoinRequest(
+    client: Socket,
+    data: GroupJoinResponseRequest,
+    authUserId: string,
+    action: GroupJoinRequestAction,
+  ): Promise<any> {
+    const member = await this.commandBus.execute(
+      new RespondToJoinRequestCommand(
+        data.conversationId,
+        authUserId,
+        data.userId,
+        action,
+      ),
+    );
+
+    const isApprove = action === GroupJoinRequestAction.APPROVE;
+
+    if (isApprove) {
+      const conversations =
+        await this.conversationRepository.getConversationById(
+          data.conversationId,
+        );
+
+      const rooms = [
+        `user-${data.userId}`,
+        ...(conversations?.getActiveMembers() ?? []).map(
+          (m) => `user-${m.userId}`,
+        ),
+      ];
+
+      await this.broadcast(
+        client,
+        Array.from(new Set(rooms)),
+        new GroupJoinApprovedEvent({
+          conversationId: data.conversationId,
+          userId: data.userId,
+        }),
+      );
+    } else {
+      await this.broadcast(
+        client,
+        [`user-${data.userId}`],
+        new GroupJoinRejectedEvent({
+          conversationId: data.conversationId,
+          userId: data.userId,
+        }),
+      );
+    }
+
+    return {
+      conversationId: data.conversationId,
+      userId: data.userId,
+      status: member.status,
+    };
+  }
+
+  @SubscribeMessage('conversation.group.member.add')
+  async addGroupMembers(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: AddGroupMembersRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const added = await this.commandBus.execute(
+      new AddGroupMembersCommand(
+        data.conversationId,
+        authUserId,
+        data.userIds ?? [],
+      ),
+    );
+
+    const conversation = await this.conversationRepository.getConversationById(
+      data.conversationId,
+    );
+    const rooms = (conversation?.getActiveMembers() ?? []).map(
+      (member) => `user-${member.userId}`,
+    );
+
+    await this.broadcast(
+      client,
+      rooms,
+      new GroupMemberAddedEvent({
+        conversationId: data.conversationId,
+        userIds: added.map((member) => member.userId),
+      }),
+    );
+
+    return {
+      conversationId: data.conversationId,
+      userIds: added.map((member) => member.userId),
+    };
+  }
+
+  @SubscribeMessage('conversation.group.member.remove')
+  async removeGroupMember(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: GroupJoinResponseRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const conversationBefore =
+      await this.conversationRepository.getConversationById(
+        data.conversationId,
+      );
+
+    await this.commandBus.execute(
+      new RemoveGroupMemberCommand(
+        data.conversationId,
+        authUserId,
+        data.userId,
+      ),
+    );
+
+    const rooms = [
+      `user-${data.userId}`,
+      ...(conversationBefore?.getActiveMembers() ?? [])
+        .filter((member) => member.userId !== data.userId)
+        .map((member) => `user-${member.userId}`),
+    ];
+
+    await this.broadcast(
+      client,
+      Array.from(new Set(rooms)),
+      new GroupMemberRemovedEvent({
+        conversationId: data.conversationId,
+        userId: data.userId,
+      }),
+    );
+
+    return { conversationId: data.conversationId, userId: data.userId };
+  }
+
+  @SubscribeMessage('conversation.group.member.role')
+  async changeGroupMemberRole(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: ChangeGroupMemberRoleRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const member = await this.commandBus.execute(
+      new ChangeGroupMemberRoleCommand(
+        data.conversationId,
+        authUserId,
+        data.userId,
+        data.role,
+      ),
+    );
+
+    const conversation = await this.conversationRepository.getConversationById(
+      data.conversationId,
+    );
+    const rooms = (conversation?.getActiveMembers() ?? []).map(
+      (m) => `user-${m.userId}`,
+    );
+
+    await this.broadcast(
+      client,
+      rooms,
+      new GroupMemberRoleChangedEvent({
+        conversationId: data.conversationId,
+        userId: data.userId,
+        role: member.role,
+      }),
+    );
+
+    return {
+      conversationId: data.conversationId,
+      userId: data.userId,
+      role: member.role,
+    };
+  }
+
+  @SubscribeMessage('conversation.group.leave')
+  async leaveGroup(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: GroupConversationRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const conversationBefore =
+      await this.conversationRepository.getConversationById(
+        data.conversationId,
+      );
+
+    await this.commandBus.execute(
+      new LeaveGroupCommand(data.conversationId, authUserId),
+    );
+
+    const rooms = (conversationBefore?.getActiveMembers() ?? []).map(
+      (member) => `user-${member.userId}`,
+    );
+
+    await this.broadcast(
+      client,
+      rooms,
+      new GroupLeftEvent({
+        conversationId: data.conversationId,
+        userId: authUserId,
+      }),
+    );
+
+    return { conversationId: data.conversationId, userId: authUserId };
+  }
+
+  @SubscribeMessage('conversation.group.members')
+  async getGroupMembers(
+    @MessageBody() data: GroupConversationRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<any> {
+    const members = await this.queryBus.execute(
+      new GetGroupMembersQuery(data.conversationId, authUserId),
+    );
+
+    const users = await this.userIntegrationPort.getUsersByIds(
+      members.map((member) => member.userId),
+    );
+    const usersById = new Map(users.map((user) => [user.id, user]));
+
+    return members.map((member) => {
+      const user = usersById.get(member.userId);
+      return {
+        id: member.id,
+        userId: member.userId,
+        username: user?.username,
+        avatarIndex: user?.avatarIndex,
+        avatar: user?.avatar,
+        role: member.role,
+        status: member.status,
+      };
+    });
   }
 }

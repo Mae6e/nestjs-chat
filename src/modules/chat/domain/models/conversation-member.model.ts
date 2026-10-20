@@ -2,9 +2,13 @@ import { Entity } from '@common/domain/entity';
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { v7 as uuidv7 } from 'uuid';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 export class ConversationMemberEntity extends Entity<string> {
   private readonly _userId: string;
+  private _role: ConversationMemberRole;
+  private _status: ConversationMemberStatus;
   private readonly _conversationId: string;
   private _lastSeenMessageId?: string;
   private _lastMessageId?: string;
@@ -47,6 +51,8 @@ export class ConversationMemberEntity extends Entity<string> {
     createdAt: Date,
     updatedAt: Date,
     userId: string,
+    role: ConversationMemberRole,
+    status: ConversationMemberStatus,
     conversationId: string,
     lastSeenMessageId?: string,
     lastMessageId?: string,
@@ -54,6 +60,8 @@ export class ConversationMemberEntity extends Entity<string> {
   ) {
     super(id, createdAt, updatedAt);
     this._userId = userId;
+    this._role = role;
+    this._status = status;
     this._conversationId = conversationId;
     this._lastSeenMessageId = lastSeenMessageId;
     this._lastMessageId = lastMessageId;
@@ -63,12 +71,16 @@ export class ConversationMemberEntity extends Entity<string> {
   public static create(
     userId: string,
     conversationId: string,
+    role: ConversationMemberRole = ConversationMemberRole.USER,
+    status: ConversationMemberStatus = ConversationMemberStatus.ACTIVE,
   ): ConversationMemberEntity {
     return new ConversationMemberEntity(
       uuidv7(),
       new Date(),
       new Date(),
       userId,
+      role,
+      status,
       conversationId,
     );
   }
@@ -76,6 +88,8 @@ export class ConversationMemberEntity extends Entity<string> {
   public static reconstruct(
     id: string,
     userId: string,
+    role: ConversationMemberRole,
+    status: ConversationMemberStatus,
     conversationId: string,
     lastSeenMessageId: string | undefined,
     lastMessageId: string | undefined,
@@ -88,6 +102,8 @@ export class ConversationMemberEntity extends Entity<string> {
       createdAt,
       updatedAt,
       userId,
+      role,
+      status,
       conversationId,
       lastSeenMessageId,
       lastMessageId,
@@ -97,6 +113,12 @@ export class ConversationMemberEntity extends Entity<string> {
 
   public get userId(): string {
     return this._userId;
+  }
+  public get role(): ConversationMemberRole {
+    return this._role;
+  }
+  public get status(): ConversationMemberStatus {
+    return this._status;
   }
   public get conversationId(): string {
     return this._conversationId;
@@ -109,6 +131,60 @@ export class ConversationMemberEntity extends Entity<string> {
   }
   public get deletedAt(): Date | undefined {
     return this._deletedAt;
+  }
+
+  public isAdmin(): boolean {
+    return this._role === ConversationMemberRole.ADMIN && this.isActive();
+  }
+
+  public isActive(): boolean {
+    return this._status === ConversationMemberStatus.ACTIVE && !this._deletedAt;
+  }
+
+  public isPending(): boolean {
+    return (
+      this._status === ConversationMemberStatus.PENDING && !this._deletedAt
+    );
+  }
+
+  public isRejected(): boolean {
+    return (
+      this._status === ConversationMemberStatus.REJECTED && !this._deletedAt
+    );
+  }
+
+  /**
+   * Marks the membership as an accepted / active membership.
+   */
+  public activate(): void {
+    this._status = ConversationMemberStatus.ACTIVE;
+    this._deletedAt = undefined;
+    this.updatedAt = new Date();
+  }
+
+  /**
+   * Marks the membership as awaiting admin approval.
+   */
+  public requestToJoin(): void {
+    this._status = ConversationMemberStatus.PENDING;
+    this._deletedAt = undefined;
+    this.updatedAt = new Date();
+  }
+
+  public approve(): void {
+    this._status = ConversationMemberStatus.ACTIVE;
+    this._deletedAt = undefined;
+    this.updatedAt = new Date();
+  }
+
+  public reject(): void {
+    this._status = ConversationMemberStatus.REJECTED;
+    this.updatedAt = new Date();
+  }
+
+  public changeRole(role: ConversationMemberRole): void {
+    this._role = role;
+    this.updatedAt = new Date();
   }
 
   public updateLastSeenMessage(messageId: string): void {

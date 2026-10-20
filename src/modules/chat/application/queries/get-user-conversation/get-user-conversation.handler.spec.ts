@@ -43,6 +43,7 @@ describe('GetUserConversationHandler', () => {
         identifier: 'identifier',
         title: 'title',
         picture: 'picture',
+        updatedBy: null,
         notSeenCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

@@ -9,13 +9,14 @@ import { RedisModule } from '@infrastructure/redis/redis.module';
 import { DatabaseModule } from '@infrastructure/database/database.module';
 import { DatabaseType } from '@infrastructure/database/database-type.enum';
 import { platformApiConfig } from '@infrastructure/platform-api/platform-api.config';
+import { uploadConfig } from '@infrastructure/upload/upload.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
-      load: [appConfig, httpConfig, wsConfig, platformApiConfig],
+      load: [appConfig, httpConfig, wsConfig, platformApiConfig, uploadConfig],
       cache: true,
     }),
     DatabaseModule.register(DatabaseType.POSTGRES),

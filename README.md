@@ -110,6 +110,7 @@ Modules never directly import internal services, database entities, or repositor
 ### CQRS & Event-Driven Workflows
 
 Commands (write operations) and Queries (read operations) are separated via `@nestjs/cqrs`. State modifications trigger Domain Events:
+
 - `MessageCreatedDomainEvent`: Broadcasts outgoing messages to connected WebSocket clients via Redis pub/sub.
 - `SignupFailedEvent`: Handled by `AuthSaga` to execute compensating transactions (`DeleteUserCommand`) ensuring cross-context data integrity.
 
@@ -199,12 +200,14 @@ make generate_keys
 ```
 
 This creates the `keys/` directory containing:
+
 - `keys/access_private.key`
 - `keys/access_public.key`
 - `keys/refresh_private.key`
 - `keys/refresh_public.key`
 
-*Manual OpenSSL alternative:*
+_Manual OpenSSL alternative:_
+
 ```bash
 mkdir -p keys
 openssl genpkey -algorithm RSA -out keys/access_private.key -pkeyopt rsa_keygen_bits:2048
@@ -238,11 +241,13 @@ docker compose exec chatterbox yarn migration:run
 ```
 
 View logs:
+
 ```bash
 docker compose logs -f chatterbox
 ```
 
 Stop services:
+
 ```bash
 docker compose down
 ```
@@ -273,14 +278,61 @@ The application starts on `http://localhost:3000` (or the configured `PORT`).
 
 All HTTP endpoints are prefixed and documented via OpenAPI:
 
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `POST` | `/v1/auth/signup` | Register a new user account and obtain initial tokens | No |
-| `POST` | `/v1/auth/signin` | Authenticate using email/username and password | No |
-| `POST` | `/v1/auth/refresh` | Rotate refresh token and obtain a new token pair | No |
-| `POST` | `/v1/auth/logout` | Revoke refresh token (single device or all devices) | Bearer JWT |
-| `POST` | `/user/block` | Block target user by ID | Bearer JWT |
-| `DELETE` | `/user/block/:targetUserId` | Unblock a previously blocked user | Bearer JWT |
+| Method   | Endpoint                            | Description                                                                                                                                                                                                 | Auth Required |
+| -------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `POST`   | `/v1/auth/signup`                   | Register a new user account and obtain initial tokens                                                                                                                                                       | No            |
+| `POST`   | `/v1/auth/signin`                   | Authenticate using email/username and password                                                                                                                                                              | No            |
+| `POST`   | `/v1/auth/refresh`                  | Rotate refresh token and obtain a new token pair                                                                                                                                                            | No            |
+| `POST`   | `/v1/auth/logout`                   | Revoke refresh token (single device or all devices)                                                                                                                                                         | Bearer JWT    |
+| `POST`   | `/user/block`                       | Block target user by ID                                                                                                                                                                                     | Bearer JWT    |
+| `DELETE` | `/user/block/:targetUserId`         | Unblock a previously blocked user                                                                                                                                                                           | Bearer JWT    |
+| `GET`    | `/v1/chat/group?page=1&pageSize=15` | Paginated list of all group conversations. Returns `memberCount` and `createdByMe` (whether the current user created the group); omits `identifier` and `lastMessage`                                       | Bearer JWT    |
+| `POST`   | `/v1/chat/group`                    | Create a group (`multipart/form-data`: `title` required, max 50 chars; `picture` file optional; `content` optional first message). Only the current user is added, as `ADMIN`                               | Bearer JWT    |
+| `PATCH`  | `/v1/chat/group/:conversationId`    | **(admin)** Update a group (`multipart/form-data`: `title` max 50 chars and/or `picture` file). If no picture is sent, the current picture is removed. Emits `conversation.group.updated` to active members | Bearer JWT    |
+
+Group `picture` values are returned as public URLs such as `/uploads/group-pictures/<file-name>`. The database stores only the uploaded file name; legacy rows containing a full public path are still returned and cleaned up correctly.
+
+### HTTP Response Format
+
+Successful HTTP responses use a common `{ data, message }` envelope:
+
+```json
+{
+  "data": {
+    "id": "0199c0f4-...",
+    "title": "Team"
+  },
+  "message": "Group created successfully"
+}
+```
+
+Paginated responses add `meta` alongside the items:
+
+```json
+{
+  "data": [],
+  "meta": {
+    "page": 1,
+    "pageSize": 15,
+    "total": 0,
+    "totalPages": 0,
+    "hasNext": false,
+    "hasPrevious": false
+  },
+  "message": "Groups retrieved successfully"
+}
+```
+
+Error responses use `data: null` and keep the HTTP status code and message:
+
+```json
+{
+  "data": null,
+  "statusCode": 409,
+  "message": "User is already blocked",
+  "error": "Conflict"
+}
+```
 
 ### Swagger Documentation
 
@@ -324,33 +376,51 @@ socket.on('error.client', (err) => {
 
 Clients emit the following events to interact with the chat service:
 
-| Event | Payload | Description |
-|---|---|---|
-| `conversation.create` | `{ targetUserId: string, content: string }` | Creates a direct conversation and dispatches the first message. |
-| `conversation.list` | `{ page?: number, pageSize?: number, filter?: string, targetUserId?: string }` | Fetches paginated conversations with last message and unread count. |
-| `conversation.message.send` | `{ conversationId: string, text: string }` | Sends a text message to an existing conversation. |
-| `conversation.message.list` | `{ conversationId: string, page?: number, pageSize?: number }` | Retrieves paginated message history for a conversation. |
-| `conversation.message.markSeen` | `{ conversationId: string, messageId: string }` | Updates user's read receipt up to the specified message. |
+| Event                              | Payload                                                                        | Description                                                                                                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conversation.create`              | `{ targetUserId: string, content: string }`                                    | Creates a direct conversation and dispatches the first message.                                                                                                                 |
+| `conversation.list`                | `{ page?: number, pageSize?: number, filter?: string, targetUserId?: string }` | Fetches paginated conversations (direct and group) with last message and unread count.                                                                                          |
+| `conversation.message.send`        | `{ conversationId: string, text: string }`                                     | Sends a text message to a direct or group conversation.                                                                                                                         |
+| `conversation.message.list`        | `{ conversationId: string, page?: number, pageSize?: number }`                 | Retrieves paginated message history for a conversation.                                                                                                                         |
+| `conversation.message.markSeen`    | `{ conversationId: string, messageId: string }`                                | Updates user's read receipt up to the specified message.                                                                                                                        |
+| `conversation.group.join`          | `{ conversationId: string }`                                                   | Requests to join a group. Admins are notified; the requester stays `PENDING` and always joins as a `USER` once approved. Use `conversation.group.member.role` to grant `ADMIN`. |
+| `conversation.group.members`       | `{ conversationId: string }`                                                   | Lists the active members and their roles (any member).                                                                                                                          |
+| `conversation.group.leave`         | `{ conversationId: string }`                                                   | Leaves a group (the last admin must promote another admin first).                                                                                                               |
+| `conversation.group.join.requests` | `{ conversationId: string, page?: number, pageSize?: number }`                 | **(admin)** Lists pending join requests.                                                                                                                                        |
+| `conversation.group.join.approve`  | `{ conversationId: string, userId: string }`                                   | **(admin)** Approves a pending join request.                                                                                                                                    |
+| `conversation.group.join.reject`   | `{ conversationId: string, userId: string }`                                   | **(admin)** Rejects a pending join request.                                                                                                                                     |
+| `conversation.group.member.add`    | `{ conversationId: string, userIds: string[] }`                                | **(admin)** Adds one or more members directly as active `USER`s.                                                                                                                |
+| `conversation.group.member.remove` | `{ conversationId: string, userId: string }`                                   | **(admin)** Removes a member from the group.                                                                                                                                    |
+| `conversation.group.member.role`   | `{ conversationId: string, userId: string, role: "USER" \| "ADMIN" }`          | **(admin)** Promotes/demotes a member. The last admin cannot be demoted.                                                                                                        |
 
 ### Server-to-Client Events
 
 Clients receive the following broadcast and direct events:
 
-| Event | Payload Summary | Description |
-|---|---|---|
-| `ready` | None | Emitted to connecting socket upon successful authorization. |
-| `conversation.created` | Conversation metadata, last message, sender details | Emitted to both sender and recipient user rooms. |
-| `conversation.message.sent` | Message ID, content, timestamp, sender info | Emitted to recipient and sender user rooms for sync. |
-| `conversation.message.seen` | `{ conversationId: string, messageId: string }` | Emitted to all conversation participants when messages are read. |
-| `user.blocked` | `{ blockerId: string, blockedId: string }` | Emitted to both parties when a block relation is created. |
-| `user.unblocked` | `{ blockerId: string, blockedId: string }` | Emitted to both parties when a block relation is removed. |
-| `error.server` | `{ statusCode: number, message: string }` | Emitted when an exception occurs during request processing. |
+| Event                                    | Payload Summary                                     | Description                                                             |
+| ---------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| `ready`                                  | None                                                | Emitted to connecting socket upon successful authorization.             |
+| `conversation.created`                   | Conversation metadata, last message, sender details | Emitted to both sender and recipient user rooms.                        |
+| `conversation.message.sent`              | Message ID, content, timestamp, sender info         | Emitted to recipient and sender user rooms for sync.                    |
+| `conversation.message.seen`              | `{ conversationId: string, messageId: string }`     | Emitted to all conversation participants when messages are read.        |
+| `conversation.group.join.requested`      | `{ conversationId, userId, requestedAt }`           | Emitted to group admins when a user requests to join.                   |
+| `conversation.group.join.approved`       | `{ conversationId, userId }`                        | Emitted to the requester and active members once a request is approved. |
+| `conversation.group.join.rejected`       | `{ conversationId, userId }`                        | Emitted to the requester when a request is rejected.                    |
+| `conversation.group.member.added`        | `{ conversationId, userIds }`                       | Emitted to all active members when members are added.                   |
+| `conversation.group.member.removed`      | `{ conversationId, userId }`                        | Emitted when a member is removed.                                       |
+| `conversation.group.member.role.changed` | `{ conversationId, userId, role }`                  | Emitted to active members when a role changes.                          |
+| `conversation.group.updated`             | `{ conversationId, title, picture, updatedBy }`     | Emitted to active members when group info changes.                      |
+| `conversation.group.left`                | `{ conversationId, userId }`                        | Emitted when a member leaves the group.                                 |
+| `user.blocked`                           | `{ blockerId: string, blockedId: string }`          | Emitted to both parties when a block relation is created.               |
+| `user.unblocked`                         | `{ blockerId: string, blockedId: string }`          | Emitted to both parties when a block relation is removed.               |
+| `error.server`                           | `{ statusCode: number, message: string }`           | Emitted when an exception occurs during request processing.             |
 
 ---
 
 ## Database & Migrations
 
 Database operations are partitioned across three PostgreSQL schemas:
+
 - `auth`: Stores refresh tokens (`auth.refresh_tokens`).
 - `user`: Stores user records (`user.users`) and block entries (`user.user_blocks`).
 - `chat`: Stores conversations (`chat.conversations`), members (`chat.conversation_members`), and messages (`chat.messages`, `chat.deleted_messages`).
@@ -452,41 +522,45 @@ nestjs-chat/
 
 Configure the following variables in `.env`:
 
-| Variable | Type | Default | Description |
-|---|---|---|---|
-| `NODE_ENV` | String | `development` | Runtime environment (`development`, `production`, `test`) |
-| `DEBUG_MODE` | Boolean | `true` | Enables detailed internal logging |
-| `PORT` | Number | `3000` | HTTP port for REST API and Swagger |
-| `POSTGRES_HOST` | String | `localhost` | PostgreSQL server hostname |
-| `POSTGRES_PORT` | Number | `5432` | PostgreSQL server port |
-| `POSTGRES_USERNAME` | String | `postgres` | PostgreSQL username |
-| `POSTGRES_PASSWORD` | String | `postgres` | PostgreSQL password |
-| `POSTGRES_DATABASE` | String | `chatterbox` | PostgreSQL database name |
-| `POSTGRES_SCHEMA` | String | `public` | Default fallback schema |
-| `POSTGRES_LOG` | Boolean | `true` | Enables TypeORM SQL query logging |
-| `POSTGRES_SLOW_QUERY_LIMIT`| Number | `1000` | Query execution threshold (ms) for slow query warnings |
-| `POSTGRES_SSL` | Boolean | `false` | Enables SSL for database connections |
-| `POSTGRES_APPLICATION_NAME`| String | `nestjs-chat` | Client identifier registered in PostgreSQL connections |
-| `POSTGRES_POOL_SIZE` | Number | `10` | Maximum database connection pool size |
-| `REDIS_HOST` | String | `localhost` | Redis server hostname |
-| `REDIS_PORT` | Number | `6379` | Redis server port |
-| `REDIS_USERNAME` | String | `""` | Redis authentication username (if required) |
-| `REDIS_PASSWORD` | String | `""` | Redis authentication password (if required) |
-| `WEBSOCKET_PORT` | Number | `3000` | WebSocket server port (co-located with HTTP by default) |
-| `LOG_USE_FILE` | Boolean | `false` | Enables logging to disk |
-| `LOG_FILE` | String | `logs/app.log`| Output path for log files when `LOG_USE_FILE=true` |
-| `LOG_LEVEL` | String | `debug` | Pino log level (`trace`, `debug`, `info`, `warn`, `error`) |
-| `AUTH_ACCESS_PUBLIC_KEY_PATH` | String | `keys/access_public.key` | Path to RS256 public key for access tokens |
-| `AUTH_ACCESS_PRIVATE_KEY_PATH` | String | `keys/access_private.key` | Path to RS256 private key for access tokens |
-| `AUTH_REFRESH_PUBLIC_KEY_PATH` | String | `keys/refresh_public.key` | Path to RS256 public key for refresh tokens |
-| `AUTH_REFRESH_PRIVATE_KEY_PATH` | String | `keys/refresh_private.key` | Path to RS256 private key for refresh tokens |
+| Variable                        | Type    | Default                    | Description                                                                   |
+| ------------------------------- | ------- | -------------------------- | ----------------------------------------------------------------------------- |
+| `NODE_ENV`                      | String  | `development`              | Runtime environment (`development`, `production`, `test`)                     |
+| `DEBUG_MODE`                    | Boolean | `true`                     | Enables detailed internal logging                                             |
+| `PORT`                          | Number  | `3000`                     | HTTP port for REST API and Swagger                                            |
+| `POSTGRES_HOST`                 | String  | `localhost`                | PostgreSQL server hostname                                                    |
+| `POSTGRES_PORT`                 | Number  | `5432`                     | PostgreSQL server port                                                        |
+| `POSTGRES_USERNAME`             | String  | `postgres`                 | PostgreSQL username                                                           |
+| `POSTGRES_PASSWORD`             | String  | `postgres`                 | PostgreSQL password                                                           |
+| `POSTGRES_DATABASE`             | String  | `chatterbox`               | PostgreSQL database name                                                      |
+| `POSTGRES_SCHEMA`               | String  | `public`                   | Default fallback schema                                                       |
+| `POSTGRES_LOG`                  | Boolean | `true`                     | Enables TypeORM SQL query logging                                             |
+| `POSTGRES_SLOW_QUERY_LIMIT`     | Number  | `1000`                     | Query execution threshold (ms) for slow query warnings                        |
+| `POSTGRES_SSL`                  | Boolean | `false`                    | Enables SSL for database connections                                          |
+| `POSTGRES_APPLICATION_NAME`     | String  | `nestjs-chat`              | Client identifier registered in PostgreSQL connections                        |
+| `POSTGRES_POOL_SIZE`            | Number  | `10`                       | Maximum database connection pool size                                         |
+| `REDIS_HOST`                    | String  | `localhost`                | Redis server hostname                                                         |
+| `REDIS_PORT`                    | Number  | `6379`                     | Redis server port                                                             |
+| `REDIS_USERNAME`                | String  | `""`                       | Redis authentication username (if required)                                   |
+| `REDIS_PASSWORD`                | String  | `""`                       | Redis authentication password (if required)                                   |
+| `WEBSOCKET_PORT`                | Number  | `3000`                     | WebSocket server port (co-located with HTTP by default)                       |
+| `UPLOAD_DIR`                    | String  | `uploads`                  | Folder (relative to the process cwd) where uploaded group pictures are stored |
+| `UPLOAD_PUBLIC_PREFIX`          | String  | `/uploads`                 | HTTP path prefix used to serve uploaded files                                 |
+| `UPLOAD_MAX_FILE_SIZE`          | Number  | `5242880`                  | Maximum upload size in bytes (5 MB)                                           |
+| `LOG_USE_FILE`                  | Boolean | `false`                    | Enables logging to disk                                                       |
+| `LOG_FILE`                      | String  | `logs/app.log`             | Output path for log files when `LOG_USE_FILE=true`                            |
+| `LOG_LEVEL`                     | String  | `debug`                    | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                    |
+| `AUTH_ACCESS_PUBLIC_KEY_PATH`   | String  | `keys/access_public.key`   | Path to RS256 public key for access tokens                                    |
+| `AUTH_ACCESS_PRIVATE_KEY_PATH`  | String  | `keys/access_private.key`  | Path to RS256 private key for access tokens                                   |
+| `AUTH_REFRESH_PUBLIC_KEY_PATH`  | String  | `keys/refresh_public.key`  | Path to RS256 public key for refresh tokens                                   |
+| `AUTH_REFRESH_PRIVATE_KEY_PATH` | String  | `keys/refresh_private.key` | Path to RS256 private key for refresh tokens                                  |
 
 ---
 
 ## Roadmap
 
 Upcoming features and architectural enhancements are tracked in [ROADMAP.md](./ROADMAP.md), including:
-- Group messaging with member roles (`OWNER`, `ADMIN`, `MEMBER`)
+
+- Group messaging with member roles (`ADMIN`, `USER`)
 - Message editing and message deletion ("delete for me" / "delete for everyone")
 - Delivery states (`SENT` -> `DELIVERED` -> `READ`)
 - Cursor-based message pagination and offline delta synchronization

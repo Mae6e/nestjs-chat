@@ -7,6 +7,7 @@ import { ConversationRepositoryPort } from '@modules/chat/application/ports/conv
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
+import { ConversationMemberEntity } from '@modules/chat/domain/models/conversation-member.model';
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
 import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
@@ -133,6 +134,55 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
     });
 
     return res;
+  }
+
+  async getMembership(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationMemberEntity | null> {
+    const member = await this.dataSource
+      .getRepository(ConversationMember)
+      .findOne({
+        where: { conversation_id: conversationId, user_id: userId },
+        withDeleted: true,
+      });
+
+    if (!member) {
+      return null;
+    }
+
+    return ConversationMember.toDomain(member);
+  }
+
+  async saveMember(
+    memberEntity: ConversationMemberEntity,
+  ): Promise<ConversationMemberEntity> {
+    const member = ConversationMember.fromDomain(memberEntity);
+    // `undefined` is ignored by TypeORM save, so make the restored/cleared
+    // soft-delete state explicit.
+    member.deleted_at = memberEntity.deletedAt ?? null;
+
+    const saved = await this.dataSource
+      .getRepository(ConversationMember)
+      .save(member);
+
+    return ConversationMember.toDomain(saved);
+  }
+
+  async softDeleteMember(
+    conversationId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const res = await this.dataSource
+      .getRepository(ConversationMember)
+      .createQueryBuilder()
+      .softDelete()
+      .from(ConversationMember)
+      .where('conversation_id = :conversationId', { conversationId })
+      .andWhere('user_id = :userId', { userId })
+      .execute();
+
+    return res.affected !== 0;
   }
 
   async block(blockerId: string, blockedId: string): Promise<boolean> {

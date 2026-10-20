@@ -4,12 +4,15 @@ import { ConversationMemberEntity } from '@modules/chat/domain/models/conversati
 import { v7 as uuidv7 } from 'uuid';
 
 import { AggregateRoot } from '@common/domain/aggregate-root';
+import { ConversationMemberRole } from '../enums/conversation-member-role.enum';
 
 export class ConversationEntity extends AggregateRoot<string> {
-  private readonly _title: string | null;
-  private readonly _picture: string | null;
+  private _title: string | null;
+  private _picture: string | null;
   private readonly _identifier: string | null;
   private readonly _type: ConversationType;
+  private readonly _createdBy: string | null;
+  private _updatedBy: string | null;
   private _deletedAt?: Date;
 
   // Domain associations
@@ -38,6 +41,54 @@ export class ConversationEntity extends AggregateRoot<string> {
     }
   }
 
+  /**
+   * Removes a member from the in-memory aggregate. Persisting the removal is
+   * handled by the repository (soft delete).
+   */
+  public removeMember(userId: string): void {
+    const member = this.getMember(userId);
+    if (!member) {
+      return;
+    }
+    member.softDelete();
+    this._members = this._members.filter((m) => m.userId !== userId);
+    this.updatedAt = new Date();
+  }
+
+  public getMember(userId: string): ConversationMemberEntity | undefined {
+    return this._members.find((m) => m.userId === userId);
+  }
+
+  public isMember(userId: string): boolean {
+    const member = this.getMember(userId);
+    return !!member && member.isActive();
+  }
+
+  public getActiveMembers(): ConversationMemberEntity[] {
+    return this._members.filter((m) => m.isActive());
+  }
+
+  public getAdmins(): ConversationMemberEntity[] {
+    return this._members.filter((m) => m.isAdmin());
+  }
+
+  public updateInfo(
+    title?: string | null,
+    picture?: string | null,
+    updatedBy?: string | null,
+  ): void {
+    if (title !== undefined) {
+      this._title = title;
+    }
+    if (picture !== undefined) {
+      this._picture = picture;
+    }
+    if (updatedBy !== undefined) {
+      this._updatedBy = updatedBy;
+    }
+    this.updatedAt = new Date();
+  }
+
   public addMessage(message: MessageEntity): void {
     this._messages.push(message);
     this._lastMessage = message;
@@ -63,6 +114,8 @@ export class ConversationEntity extends AggregateRoot<string> {
     title: string | null = null,
     picture: string | null = null,
     identifier: string | null = null,
+    createdBy: string | null = null,
+    updatedBy: string | null = null,
     deletedAt?: Date,
   ) {
     super(id, createdAt, updatedAt);
@@ -70,6 +123,8 @@ export class ConversationEntity extends AggregateRoot<string> {
     this._title = title;
     this._picture = picture;
     this._identifier = identifier;
+    this._createdBy = createdBy;
+    this._updatedBy = updatedBy;
     this._deletedAt = deletedAt;
   }
 
@@ -88,10 +143,68 @@ export class ConversationEntity extends AggregateRoot<string> {
       uuidv7(),
     );
 
-    conversation.addMember(ConversationMemberEntity.create(userId, id));
-    conversation.addMember(ConversationMemberEntity.create(targetUserId, id));
+    conversation.addMember(
+      ConversationMemberEntity.create(userId, id, ConversationMemberRole.USER),
+    );
+    conversation.addMember(
+      ConversationMemberEntity.create(
+        targetUserId,
+        id,
+        ConversationMemberRole.USER,
+      ),
+    );
 
     // TODO: Apply ConversationCreatedEvent here
+
+    return conversation;
+  }
+
+  /**
+   * Creates a GROUP conversation. The creator becomes the group ADMIN.
+   *
+   * `memberIds` is an internal seeding helper (mainly for tests); the public
+   * group creation flow passes none, so only the creator is added and everyone
+   * else has to go through the join-request flow.
+   */
+  public static createGroup(
+    creatorId: string,
+    title: string,
+    memberIds: string[] = [],
+    picture: string | null = null,
+  ): ConversationEntity {
+    const id = uuidv7();
+    const conversation = new ConversationEntity(
+      id,
+      new Date(),
+      new Date(),
+      ConversationType.GROUP,
+      title,
+      picture,
+      uuidv7(),
+      creatorId,
+      creatorId,
+    );
+
+    conversation.addMember(
+      ConversationMemberEntity.create(
+        creatorId,
+        id,
+        ConversationMemberRole.ADMIN,
+      ),
+    );
+
+    for (const memberId of memberIds) {
+      if (memberId === creatorId) {
+        continue;
+      }
+      conversation.addMember(
+        ConversationMemberEntity.create(
+          memberId,
+          id,
+          ConversationMemberRole.USER,
+        ),
+      );
+    }
 
     return conversation;
   }
@@ -104,6 +217,8 @@ export class ConversationEntity extends AggregateRoot<string> {
     identifier: string | null,
     createdAt: Date,
     updatedAt: Date,
+    createdBy: string | null = null,
+    updatedBy: string | null = null,
     deletedAt?: Date,
   ): ConversationEntity {
     return new ConversationEntity(
@@ -114,6 +229,8 @@ export class ConversationEntity extends AggregateRoot<string> {
       title,
       picture,
       identifier,
+      createdBy,
+      updatedBy,
       deletedAt,
     );
   }
@@ -129,6 +246,12 @@ export class ConversationEntity extends AggregateRoot<string> {
   }
   public get identifier(): string | null {
     return this._identifier;
+  }
+  public get createdBy(): string | null {
+    return this._createdBy;
+  }
+  public get updatedBy(): string | null {
+    return this._updatedBy;
   }
   public get deletedAt(): Date | undefined {
     return this._deletedAt;

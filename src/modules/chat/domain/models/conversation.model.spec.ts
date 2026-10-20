@@ -3,6 +3,7 @@ import { ConversationType } from '../enums/conversation-type.enum';
 import { ConversationMemberEntity } from './conversation-member.model';
 import { MessageEntity } from './message.model';
 import { MessageType } from '../enums/chat-type.enum';
+import { ConversationMemberRole } from '../enums/conversation-member-role.enum';
 
 describe('ConversationEntity', () => {
   it('should create direct correctly and add members', () => {
@@ -88,5 +89,46 @@ describe('ConversationEntity', () => {
     expect(conv.deletedAt).toBeDefined();
     conv.restore();
     expect(conv.deletedAt).toBeUndefined();
+  });
+
+  describe('groups', () => {
+    it('should create a group with the creator as admin and invitees as users', () => {
+      const conv = ConversationEntity.createGroup('creator', 'Team', [
+        'u-2',
+        'u-3',
+        'creator',
+      ]);
+
+      expect(conv.type).toBe(ConversationType.GROUP);
+      expect(conv.title).toBe('Team');
+      expect(conv.createdBy).toBe('creator');
+      expect(conv.updatedBy).toBe('creator');
+      expect(conv.members).toHaveLength(3);
+
+      const creator = conv.getMember('creator');
+      expect(creator?.role).toBe(ConversationMemberRole.ADMIN);
+      expect(creator?.isAdmin()).toBe(true);
+
+      expect(conv.getMember('u-2')?.role).toBe(ConversationMemberRole.USER);
+      expect(conv.getActiveMembers()).toHaveLength(3);
+      expect(conv.getAdmins()).toHaveLength(1);
+    });
+
+    it('should update group info', () => {
+      const conv = ConversationEntity.createGroup('creator', 'Team');
+      conv.updateInfo('New team', 'pic.png', 'admin-2');
+
+      expect(conv.title).toBe('New team');
+      expect(conv.picture).toBe('pic.png');
+      expect(conv.updatedBy).toBe('admin-2');
+    });
+
+    it('should remove members using a soft delete', () => {
+      const conv = ConversationEntity.createGroup('creator', 'Team', ['u-2']);
+      conv.removeMember('u-2');
+
+      expect(conv.getMember('u-2')).toBeUndefined();
+      expect(conv.getActiveMembers()).toHaveLength(1);
+    });
   });
 });

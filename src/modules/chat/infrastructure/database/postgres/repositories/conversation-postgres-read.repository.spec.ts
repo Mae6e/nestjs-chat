@@ -5,6 +5,7 @@ import { DatabaseType } from '@infrastructure/database/database-type.enum';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
+import { UserBlock } from '../entities/user-block.entity';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 describe('ConversationPostgresReadRepository', () => {
@@ -14,6 +15,7 @@ describe('ConversationPostgresReadRepository', () => {
   let conversationRepoMock: any;
   let messageRepoMock: any;
   let conversationMemberRepoMock: any;
+  let userBlockRepoMock: any;
 
   beforeEach(async () => {
     queryBuilderMock = {
@@ -28,6 +30,7 @@ describe('ConversationPostgresReadRepository', () => {
       from: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
       offset: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       setParameter: jest.fn().mockReturnThis(),
@@ -48,6 +51,10 @@ describe('ConversationPostgresReadRepository', () => {
     };
 
     conversationMemberRepoMock = {
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
+    };
+
+    userBlockRepoMock = {
       createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
     };
 
@@ -82,6 +89,10 @@ describe('ConversationPostgresReadRepository', () => {
             DatabaseType.POSTGRES,
           ),
           useValue: conversationMemberRepoMock,
+        },
+        {
+          provide: getRepositoryToken(UserBlock, DatabaseType.POSTGRES),
+          useValue: userBlockRepoMock,
         },
         {
           provide: getDataSourceToken(DatabaseType.POSTGRES),
@@ -145,6 +156,87 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data).toHaveLength(1);
       expect(result.data[0].id).toBe('conv-1');
       expect(result.data[0].notSeenCount).toBe(1);
+    });
+  });
+
+  describe('getUserGroupConversationList', () => {
+    it('should return all groups without filtering by membership', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00.000Z');
+      const updatedAt = new Date('2024-01-02T00:00:00.000Z');
+
+      queryBuilderMock.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'group-mine',
+            type: ConversationType.GROUP,
+            identifier: 'should-not-be-returned',
+            title: 'My group',
+            picture: null,
+            created_by: 'user-1',
+            created_at: createdAt,
+            updated_at: updatedAt,
+          },
+          {
+            id: 'group-other',
+            type: ConversationType.GROUP,
+            identifier: 'should-not-be-returned',
+            title: 'Another group',
+            picture: null,
+            created_by: 'user-2',
+            created_at: createdAt,
+            updated_at: updatedAt,
+          },
+        ],
+        2,
+      ]);
+      queryBuilderMock.getRawMany
+        .mockResolvedValueOnce([
+          { conversationId: 'group-mine', notSeenCount: '3' },
+          { conversationId: 'group-other', notSeenCount: '0' },
+        ])
+        .mockResolvedValueOnce([
+          { conversationId: 'group-mine', memberCount: '2' },
+          { conversationId: 'group-other', memberCount: '4' },
+        ]);
+
+      const result = await repository.getUserGroupConversationList('user-1', {
+        page: 1,
+        pageSize: 10,
+        limit: 10,
+        offset: 0,
+      });
+
+      expect(queryBuilderMock.innerJoin).not.toHaveBeenCalled();
+      expect(queryBuilderMock.where).toHaveBeenCalledWith('c.type = :type', {
+        type: ConversationType.GROUP,
+      });
+      expect(result.data).toEqual([
+        {
+          id: 'group-mine',
+          type: ConversationType.GROUP,
+          title: 'My group',
+          picture: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+          memberCount: 2,
+          createdByMe: true,
+          notSeenCount: 3,
+        },
+        {
+          id: 'group-other',
+          type: ConversationType.GROUP,
+          title: 'Another group',
+          picture: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+          memberCount: 4,
+          createdByMe: false,
+          notSeenCount: 0,
+        },
+      ]);
+      expect(result.data[0]).not.toHaveProperty('identifier');
+      expect(result.data[0]).not.toHaveProperty('lastMessage');
+      expect(result.data[0]).not.toHaveProperty('updatedBy');
     });
   });
 

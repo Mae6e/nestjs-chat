@@ -1,6 +1,8 @@
 import { ConversationMemberEntity } from './conversation-member.model';
 import { ConversationEntity } from './conversation.model';
 import { MessageEntity } from './message.model';
+import { ConversationMemberRole } from '../enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '../enums/conversation-member-status.enum';
 
 describe('ConversationMemberEntity', () => {
   it('should create correctly', () => {
@@ -8,6 +10,8 @@ describe('ConversationMemberEntity', () => {
     expect(member.id).toBeDefined();
     expect(member.userId).toBe('user-1');
     expect(member.conversationId).toBe('conv-1');
+    expect(member.role).toBe(ConversationMemberRole.USER);
+    expect(member.status).toBe(ConversationMemberStatus.ACTIVE);
   });
 
   it('should reconstruct correctly', () => {
@@ -15,6 +19,8 @@ describe('ConversationMemberEntity', () => {
     const member = ConversationMemberEntity.reconstruct(
       'id-1',
       'user-1',
+      ConversationMemberRole.USER,
+      ConversationMemberStatus.ACTIVE,
       'conv-1',
       'msg-1',
       'msg-2',

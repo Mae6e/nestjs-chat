@@ -1,4 +1,6 @@
 import { IsInt, IsNotEmpty, IsNumberString, IsString } from 'class-validator';
+import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 
 export class GetUserConversationListRequest {
   @IsNotEmpty()
@@ -33,9 +35,12 @@ export class UserConversationListItemMessage {
 
 export class UserConversationListItem {
   id: string;
+  type: ConversationType;
+  role: ConversationMemberRole;
   identifier: string;
   identifierAvatarIndex: number;
   identifierAvatar?: string;
+  memberCount: number;
   notSeenCount: number;
   lastMessage: UserConversationListItemMessage;
 }

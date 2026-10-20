@@ -28,6 +28,12 @@ export class Conversation {
   @Index('conversations_identifier_uniq', { unique: true })
   identifier: string | null;
 
+  @Column({ type: 'char', length: 24, nullable: true })
+  created_by: string | null;
+
+  @Column({ type: 'char', length: 24, nullable: true })
+  updated_by: string | null;
+
   @Column({
     type: 'enum',
     enum: ConversationType,
@@ -61,6 +67,8 @@ export class Conversation {
     conversation.title = entity.title;
     conversation.picture = entity.picture;
     conversation.identifier = entity.identifier;
+    conversation.created_by = entity.createdBy;
+    conversation.updated_by = entity.updatedBy;
     conversation.type = entity.type;
     conversation.created_at = entity.createdAt;
     conversation.updated_at = entity.updatedAt;
@@ -90,6 +98,8 @@ export class Conversation {
       conversation.identifier,
       conversation.created_at,
       conversation.updated_at,
+      conversation.created_by,
+      conversation.updated_by,
       conversation.deleted_at,
     );
 

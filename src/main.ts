@@ -1,14 +1,18 @@
-import { HttpAdapterHost, NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigType } from '@nestjs/config';
 import { httpConfig } from '@infrastructure/http/http.config';
 import { wsConfig } from '@infrastructure/websocket/ws.config';
+import { uploadConfig } from '@infrastructure/upload/upload.config';
 import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { RedisProvider } from '@infrastructure/redis/redis.provider';
 import { RedisIoAdapter } from '@infrastructure/websocket/adapter/redis/redis-io.adapter';
 import { GlobalHttpExceptionFilter } from '@common/http/filters/global-http-exception.filter';
+import { BaseResponseInterceptor } from '@common/http/interceptors/base-response.interceptor';
+import { join } from 'node:path';
 
 function setUpSwagger(app: INestApplication) {
   const swaggerConfig = new DocumentBuilder()
@@ -30,7 +34,7 @@ function setUpSwagger(app: INestApplication) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
 
@@ -40,8 +44,16 @@ async function bootstrap() {
 
   app.useLogger(logger);
   app.enableCors();
+
+  // Serve uploaded files (e.g. group pictures) from the configured folder.
+  const uploadConf = app.get<ConfigType<typeof uploadConfig>>(uploadConfig.KEY);
+  app.useStaticAssets(join(process.cwd(), uploadConf.dir), {
+    prefix: `${uploadConf.publicPrefix.replace(/\/+$/, '')}/`,
+  });
+
   const httpAdapterHost = app.get(HttpAdapterHost);
   app.useGlobalFilters(new GlobalHttpExceptionFilter(httpAdapterHost));
+  app.useGlobalInterceptors(new BaseResponseInterceptor(app.get(Reflector)));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
