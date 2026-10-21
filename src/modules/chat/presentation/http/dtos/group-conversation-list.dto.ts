@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 export class GetGroupConversationListQueryDto {
@@ -18,6 +25,16 @@ export class GetGroupConversationListQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+
+  @ApiPropertyOptional({
+    description: 'Case-insensitive search by group title.',
+    example: 'team',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  search?: string;
 }
 
 export class GroupConversationListItemDto {
@@ -51,7 +68,9 @@ export class GroupConversationListItemDto {
       'True when the current user created the group; false when another user created it.',
   })
   createdByMe: boolean;
+}
 
+export class MyGroupConversationListItemDto extends GroupConversationListItemDto {
   @ApiProperty()
   notSeenCount: number;
 }
@@ -90,6 +109,25 @@ export class GroupConversationListBaseResponseDto {
 
   @ApiProperty({ type: [GroupConversationListItemDto] })
   data: GroupConversationListItemDto[];
+
+  @ApiProperty({ type: GroupConversationListMetaDto })
+  meta: GroupConversationListMetaDto;
+}
+
+export class MyGroupConversationListResponseDto {
+  @ApiProperty({ type: [MyGroupConversationListItemDto] })
+  data: MyGroupConversationListItemDto[];
+
+  @ApiProperty({ type: GroupConversationListMetaDto })
+  meta: GroupConversationListMetaDto;
+}
+
+export class MyGroupConversationListBaseResponseDto {
+  @ApiProperty({ example: 'My groups retrieved successfully' })
+  message: string;
+
+  @ApiProperty({ type: [MyGroupConversationListItemDto] })
+  data: MyGroupConversationListItemDto[];
 
   @ApiProperty({ type: GroupConversationListMetaDto })
   meta: GroupConversationListMetaDto;

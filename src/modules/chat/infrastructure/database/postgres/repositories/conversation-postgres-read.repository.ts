@@ -87,15 +87,27 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
         .leftJoinAndSelect('lastMessage.sender', 'lastMessageSender');
     }
 
-    if (options.filterUserIds && options.filterUserIds.length > 0) {
-      query.andWhereExists(
-        this.conversationMemberRepository
-          .createQueryBuilder('cm_filter')
-          .where('cm_filter.user_id IN (:...userIds)', {
-            userIds: options.filterUserIds,
-          })
-          .andWhere('cm_filter.conversation_id = c.id'),
-      );
+    const filterUserIds = options.filterUserIds ?? [];
+    const titleSearch = options.titleSearch?.trim();
+    if (filterUserIds.length > 0 || titleSearch) {
+      const conditions: string[] = [];
+      const parameters: Record<string, unknown> = {};
+
+      if (filterUserIds.length > 0) {
+        // Match conversations containing any of the selected users.
+        conditions.push(
+          'EXISTS (SELECT 1 FROM chat.conversation_members cm_filter WHERE cm_filter.user_id IN (:...filterUserIds) AND cm_filter.conversation_id = c.id)',
+        );
+        parameters.filterUserIds = filterUserIds;
+      }
+
+      if (titleSearch) {
+        // The conversation list `filter` also searches group titles.
+        conditions.push('c.title ILIKE :titleSearch');
+        parameters.titleSearch = `%${titleSearch}%`;
+      }
+
+      query.andWhere(`(${conditions.join(' OR ')})`, parameters);
     }
 
     if (options.type != null) {
@@ -186,16 +198,37 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
   async getUserGroupConversationList(
     userId: string,
     pagination: PaginationOptions,
+    search?: string,
+    joinedOnly?: boolean,
   ): Promise<PaginatedResult<GroupConversationListItemReadDto>> {
-    // Return every group. `userId` is only used to mark ownership
+    // Return every group by default. `userId` is only used to mark ownership
     // (`createdByMe`) and calculate per-user unread counts; it is not a
-    // membership filter.
+    // membership filter unless `joinedOnly` is requested.
     const query = this.conversationRepository
       .createQueryBuilder('c')
       .where('c.type = :type', { type: ConversationType.GROUP })
       .orderBy('c.updated_at', 'DESC')
       .offset(pagination.offset)
       .limit(pagination.limit);
+
+    const searchTerm = search?.trim();
+    if (searchTerm) {
+      query.andWhere('c.title ILIKE :search', {
+        search: `%${searchTerm}%`,
+      });
+    }
+
+    if (joinedOnly) {
+      query.andWhereExists(
+        this.conversationMemberRepository
+          .createQueryBuilder('cm_joined')
+          .where('cm_joined.conversation_id = c.id')
+          .andWhere('cm_joined.user_id = :userId', { userId })
+          .andWhere('cm_joined.status = :active', {
+            active: ConversationMemberStatus.ACTIVE,
+          }),
+      );
+    }
 
     const [conversations, count] = await query.getManyAndCount();
 

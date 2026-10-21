@@ -8,6 +8,7 @@ import { AuthIntegrationPort } from '@modules/chat/application/ports/auth-integr
 import { WsException } from '@nestjs/websockets';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { DeleteConversationCommand } from '@modules/chat/application/commands/delete-conversation/delete-conversation.command';
+import { GetUserConversationListQuery } from '@modules/chat/application/queries/get-user-conversation-list/get-user-conversation-list.query';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
 import { FileStoragePort } from '@modules/chat/application/ports/file-storage.port';
 
@@ -223,9 +224,12 @@ describe('ChatWsGateway', () => {
       expect(
         userIntegrationPort.getUserIdsByNameOrUsername,
       ).toHaveBeenCalledWith('jan');
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.titleSearch).toBe('jan');
     });
 
-    it('should return empty if filter resolves to 0 users', async () => {
+    it('should still search titles when the filter resolves to 0 users', async () => {
       userIntegrationPort.getUserIdsByNameOrUsername.mockResolvedValue([]);
       queryBus.execute.mockResolvedValue({ meta: {}, data: [] });
       const result = await gateway.getUserConversationList(
@@ -233,6 +237,9 @@ describe('ChatWsGateway', () => {
         'user-1',
       );
       expect(result.data).toEqual([]);
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.titleSearch).toBe('jan');
     });
   });
 

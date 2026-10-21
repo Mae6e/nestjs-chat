@@ -257,17 +257,19 @@ export class ChatWsGateway
   ): Promise<any> {
     const pagination = PaginationHelper.parse(data.page, data.pageSize);
 
+    const filterText = data.filter?.trim();
     let filteredUserIds: string[] = [];
-    if (data.filter) {
+    if (filterText) {
       filteredUserIds =
-        await this.userIntegrationPort.getUserIdsByNameOrUsername(data.filter);
+        await this.userIntegrationPort.getUserIdsByNameOrUsername(filterText);
     }
 
     if (data.targetUserId) {
       filteredUserIds.push(data.targetUserId);
     }
 
-    if (data.filter && filteredUserIds.length === 0) {
+    // A filter that only contains whitespace cannot match a title or a user.
+    if (data.filter && !filterText && filteredUserIds.length === 0) {
       return PaginationHelper.createResult([], 0, pagination);
     }
 
@@ -277,6 +279,7 @@ export class ChatWsGateway
         filterUserIds: filteredUserIds.filter(
           (userId) => userId && userId !== authUserId,
         ),
+        titleSearch: filterText || undefined,
         withLastMessage: true,
       }),
     );

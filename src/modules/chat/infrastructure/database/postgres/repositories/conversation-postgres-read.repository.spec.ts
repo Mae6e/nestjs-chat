@@ -7,6 +7,7 @@ import { Message } from '../entities/message.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
 import { UserBlock } from '../entities/user-block.entity';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 describe('ConversationPostgresReadRepository', () => {
   let repository: ConversationPostgresReadRepository;
@@ -157,6 +158,35 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data[0].id).toBe('conv-1');
       expect(result.data[0].notSeenCount).toBe(1);
     });
+
+    it('should match conversations by user filter or title search', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+        filterUserIds: ['user-2'],
+        titleSearch: '  team  ',
+      });
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        '(EXISTS (SELECT 1 FROM chat.conversation_members cm_filter WHERE cm_filter.user_id IN (:...filterUserIds) AND cm_filter.conversation_id = c.id) OR c.title ILIKE :titleSearch)',
+        { filterUserIds: ['user-2'], titleSearch: '%team%' },
+      );
+    });
+
+    it('should search conversation titles without a user filter', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+        titleSearch: 'team',
+      });
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        '(c.title ILIKE :titleSearch)',
+        { titleSearch: '%team%' },
+      );
+    });
   });
 
   describe('getUserGroupConversationList', () => {
@@ -207,6 +237,7 @@ describe('ConversationPostgresReadRepository', () => {
       });
 
       expect(queryBuilderMock.innerJoin).not.toHaveBeenCalled();
+      expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
       expect(queryBuilderMock.where).toHaveBeenCalledWith('c.type = :type', {
         type: ConversationType.GROUP,
       });
@@ -237,6 +268,55 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data[0]).not.toHaveProperty('identifier');
       expect(result.data[0]).not.toHaveProperty('lastMessage');
       expect(result.data[0]).not.toHaveProperty('updatedBy');
+    });
+
+    it('should filter groups by title', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserGroupConversationList(
+        'user-1',
+        {
+          page: 1,
+          pageSize: 10,
+          limit: 10,
+          offset: 0,
+        },
+        '  team  ',
+      );
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'c.title ILIKE :search',
+        { search: '%team%' },
+      );
+    });
+
+    it('should filter to groups where the user is an active member', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserGroupConversationList(
+        'user-1',
+        {
+          page: 1,
+          pageSize: 10,
+          limit: 10,
+          offset: 0,
+        },
+        undefined,
+        true,
+      );
+
+      expect(queryBuilderMock.andWhereExists).toHaveBeenCalled();
+      expect(queryBuilderMock.where).toHaveBeenCalledWith(
+        'cm_joined.conversation_id = c.id',
+      );
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm_joined.user_id = :userId',
+        { userId: 'user-1' },
+      );
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm_joined.status = :active',
+        { active: ConversationMemberStatus.ACTIVE },
+      );
     });
   });
 

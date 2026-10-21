@@ -31,6 +31,8 @@ export abstract class ConversationReadRepositoryPort {
   abstract getUserGroupConversationList(
     userId: string,
     pagination: PaginationOptions,
+    search?: string,
+    joinedOnly?: boolean,
   ): Promise<PaginatedResult<GroupConversationListItemReadDto>>;
 
   abstract getUserConversationIds(

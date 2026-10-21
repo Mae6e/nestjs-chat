@@ -134,9 +134,41 @@ describe('ChatHttpController', () => {
       expect(response).toEqual(result);
     });
 
-    it('should return stored picture keys as public URLs', async () => {
+    it('should pass the title search to the query', async () => {
       queryBus.execute.mockResolvedValue({
-        data: [{ id: 'group-1', picture: 'picture.png' }],
+        data: [],
+        meta: {
+          page: 1,
+          pageSize: 10,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrevious: false,
+        },
+      });
+
+      await controller.getGroupConversationList(
+        { page: 1, pageSize: 10, search: 'team' },
+        'auth-user',
+      );
+
+      expect(queryBus.execute).toHaveBeenCalledWith(
+        new GetUserGroupConversationListQuery(
+          'auth-user',
+          {
+            page: 1,
+            pageSize: 10,
+            offset: 0,
+            limit: 10,
+          },
+          'team',
+        ),
+      );
+    });
+
+    it('should return stored picture keys as public URLs without notSeenCount', async () => {
+      queryBus.execute.mockResolvedValue({
+        data: [{ id: 'group-1', picture: 'picture.png', notSeenCount: 3 }],
         meta: {
           page: 1,
           pageSize: 10,
@@ -156,6 +188,58 @@ describe('ChatHttpController', () => {
         '/uploads/group-pictures/picture.png',
       );
       expect(response.data[0]).not.toHaveProperty('updatedBy');
+      expect(response.data[0]).not.toHaveProperty('notSeenCount');
+    });
+  });
+
+  describe('getMyGroupConversationList', () => {
+    it('should query only joined groups and keep notSeenCount', async () => {
+      queryBus.execute.mockResolvedValue({
+        data: [
+          {
+            id: 'group-1',
+            type: ConversationType.GROUP,
+            title: 'Team',
+            picture: 'picture.png',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-02T00:00:00.000Z',
+            memberCount: 2,
+            createdByMe: true,
+            notSeenCount: 4,
+          },
+        ],
+        meta: {
+          page: 1,
+          pageSize: 10,
+          total: 1,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false,
+        },
+      });
+
+      const response = await controller.getMyGroupConversationList(
+        { page: 1, pageSize: 10, search: 'team' },
+        'auth-user',
+      );
+
+      expect(queryBus.execute).toHaveBeenCalledWith(
+        new GetUserGroupConversationListQuery(
+          'auth-user',
+          {
+            page: 1,
+            pageSize: 10,
+            offset: 0,
+            limit: 10,
+          },
+          'team',
+          true,
+        ),
+      );
+      expect(response.data[0].notSeenCount).toBe(4);
+      expect(response.data[0].picture).toBe(
+        '/uploads/group-pictures/picture.png',
+      );
     });
   });
 

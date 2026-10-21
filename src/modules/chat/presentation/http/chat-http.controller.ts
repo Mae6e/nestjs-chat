@@ -60,6 +60,8 @@ import {
   GetGroupConversationListQueryDto,
   GroupConversationListBaseResponseDto,
   GroupConversationListResponseDto,
+  MyGroupConversationListBaseResponseDto,
+  MyGroupConversationListResponseDto,
 } from '@modules/chat/presentation/http/dtos/group-conversation-list.dto';
 import { UpdateGroupConversationCommand } from '@modules/chat/application/commands/update-group-conversation/update-group-conversation.command';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
@@ -88,7 +90,7 @@ export class ChatHttpController {
   @ApiOperation({
     summary: 'List group conversations',
     description:
-      'Returns a paginated list of all groups. `createdByMe` indicates whether the current user created each group.',
+      'Returns a paginated list of all groups. Use `search` to filter by group title. `createdByMe` indicates whether the current user created each group.',
   })
   @ApiOkResponse({ type: GroupConversationListBaseResponseDto })
   @ResponseMessage('Groups retrieved successfully')
@@ -101,16 +103,41 @@ export class ChatHttpController {
     const pagination = PaginationHelper.parse(query.page, query.pageSize);
 
     const result = (await this.queryBus.execute(
-      new GetUserGroupConversationListQuery(authUserId, pagination),
+      new GetUserGroupConversationListQuery(
+        authUserId,
+        pagination,
+        query.search,
+      ),
     )) as GroupConversationListResponseDto;
 
-    return {
-      ...result,
-      data: result.data.map((item) => ({
-        ...item,
-        picture: this.fileStorage.getGroupPictureUrl(item.picture),
-      })),
-    };
+    return this.mapGroupConversationListResponse(result);
+  }
+
+  @ApiOperation({
+    summary: 'List my group conversations',
+    description:
+      'Returns a paginated list of groups where the current user is an active member. Supports the same `search` filter as `GET /v1/chat/group` and additionally returns `notSeenCount`.',
+  })
+  @ApiOkResponse({ type: MyGroupConversationListBaseResponseDto })
+  @ResponseMessage('My groups retrieved successfully')
+  @Get('group/mine')
+  @UseGuards(ChatHttpGuard)
+  async getMyGroupConversationList(
+    @Query() query: GetGroupConversationListQueryDto,
+    @CurrentUserId() authUserId: string,
+  ): Promise<MyGroupConversationListResponseDto> {
+    const pagination = PaginationHelper.parse(query.page, query.pageSize);
+
+    const result = (await this.queryBus.execute(
+      new GetUserGroupConversationListQuery(
+        authUserId,
+        pagination,
+        query.search,
+        true,
+      ),
+    )) as MyGroupConversationListResponseDto;
+
+    return this.mapMyGroupConversationListResponse(result);
   }
 
   @ApiOperation({
@@ -417,5 +444,35 @@ export class ChatHttpController {
     );
 
     return {};
+  }
+
+  private mapGroupConversationListResponse(
+    result: GroupConversationListResponseDto,
+  ): GroupConversationListResponseDto {
+    return {
+      ...result,
+      data: result.data.map((item) => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        picture: this.fileStorage.getGroupPictureUrl(item.picture),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        memberCount: item.memberCount,
+        createdByMe: item.createdByMe,
+      })),
+    };
+  }
+
+  private mapMyGroupConversationListResponse(
+    result: MyGroupConversationListResponseDto,
+  ): MyGroupConversationListResponseDto {
+    return {
+      ...result,
+      data: result.data.map((item) => ({
+        ...item,
+        picture: this.fileStorage.getGroupPictureUrl(item.picture),
+      })),
+    };
   }
 }

@@ -17,6 +17,8 @@ export class GetUserGroupConversationListHandler implements IQueryHandler<
     return this.queryRepo.getUserGroupConversationList(
       query.userId,
       query.pagination,
+      query.search,
+      query.joinedOnly,
     );
   }
 }
