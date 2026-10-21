@@ -68,6 +68,7 @@ import {
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
 import { FileStoragePort } from '@modules/chat/application/ports/file-storage.port';
 import { ChatUser } from '@modules/chat/application/ports/user-integration.port';
+import { DomainException } from '@common/exceptions/domain.exception';
 
 @UseGuards(ChatWsGuard)
 @UseFilters(new GlobalWsExceptionFilter())
@@ -605,36 +606,43 @@ export class ChatWsGateway
     @MessageBody() data: GroupConversationRequest,
     @CurrentUserId() authUserId: string,
   ): Promise<any> {
-    const member = await this.commandBus.execute(
-      new RequestJoinGroupCommand(data.conversationId, authUserId),
-    );
-
-    const conversation = await this.conversationRepository.getConversationById(
-      data.conversationId,
-    );
-
-    if (conversation) {
-      const adminRooms = conversation
-        .getAdmins()
-        .filter((admin) => admin.userId !== authUserId)
-        .map((admin) => `user-${admin.userId}`);
-
-      await this.broadcast(
-        client,
-        adminRooms,
-        new GroupJoinRequestedEvent({
-          conversationId: data.conversationId,
-          userId: authUserId,
-          requestedAt: new Date().toISOString(),
-        }),
+    try {
+      const member = await this.commandBus.execute(
+        new RequestJoinGroupCommand(data.conversationId, authUserId),
       );
-    }
 
-    return {
-      conversationId: data.conversationId,
-      userId: authUserId,
-      status: member.status,
-    };
+      const conversation =
+        await this.conversationRepository.getConversationById(
+          data.conversationId,
+        );
+
+      if (conversation) {
+        const adminRooms = conversation
+          .getAdmins()
+          .filter((admin) => admin.userId !== authUserId)
+          .map((admin) => `user-${admin.userId}`);
+
+        await this.broadcast(
+          client,
+          adminRooms,
+          new GroupJoinRequestedEvent({
+            conversationId: data.conversationId,
+            userId: authUserId,
+            requestedAt: new Date().toISOString(),
+          }),
+        );
+      }
+
+      return {
+        conversationId: data.conversationId,
+        status: member.status,
+      };
+    } catch (error) {
+      if (error instanceof DomainException) {
+        return { status: 'error', code: error.code, message: error.message };
+      }
+      throw error;
+    }
   }
 
   @SubscribeMessage('conversation.group.join.requests')
@@ -652,14 +660,14 @@ export class ChatWsGateway
       ),
     );
 
-    const users = await this.userIntegrationPort.getUsersByIds(
-      requests.data.map((request) => request.userId),
-    );
-    const usersById = new Map(users.map((user) => [user.id, user]));
+    let result = [];
+    if (requests && requests.data?.length) {
+      const users = await this.userIntegrationPort.getUsersByIds(
+        requests.data.map((request) => request.userId),
+      );
 
-    return {
-      meta: requests.meta,
-      data: requests.data.map((request) => {
+      const usersById = new Map(users.map((user) => [user.id, user]));
+      result = requests.data.map((request) => {
         const user = usersById.get(request.userId);
         return {
           id: request.id,
@@ -670,7 +678,12 @@ export class ChatWsGateway
           role: request.role,
           status: request.status,
         };
-      }),
+      });
+    }
+
+    return {
+      meta: requests.meta,
+      data: result,
     };
   }
 

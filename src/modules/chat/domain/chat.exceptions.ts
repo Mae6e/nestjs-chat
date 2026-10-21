@@ -70,6 +70,18 @@ export class GroupAdminRequiredException extends DomainException {
   }
 }
 
+export class GroupMemberLimitExceededException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group has reached its maximum number of members: ${reason}`
+        : 'Group has reached its maximum number of members',
+      'CHAT_GROUP_MEMBER_LIMIT_EXCEEDED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
 export class GroupMemberAlreadyExistsException extends DomainException {
   constructor(reason?: string) {
     super(
@@ -77,6 +89,18 @@ export class GroupMemberAlreadyExistsException extends DomainException {
         ? `User is already a member of the group: ${reason}`
         : 'User is already a member of the group',
       'CHAT_GROUP_MEMBER_ALREADY_EXISTS',
+      'CONFLICT',
+    );
+  }
+}
+
+export class GroupMemberRequestPendingException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `User already has a pending request to join the group: ${reason}`
+        : 'User already has a pending request to join the group',
+      'CHAT_GROUP_MEMBER_REQUEST_PENDING',
       'CONFLICT',
     );
   }

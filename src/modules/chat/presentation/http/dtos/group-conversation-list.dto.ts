@@ -8,7 +8,8 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 export class GetGroupConversationListQueryDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -41,9 +42,6 @@ export class GroupConversationListItemDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty({ enum: ConversationType })
-  type: string;
-
   @ApiPropertyOptional({ type: String, nullable: true })
   title: string | null;
 
@@ -71,6 +69,12 @@ export class GroupConversationListItemDto {
 }
 
 export class MyGroupConversationListItemDto extends GroupConversationListItemDto {
+  @ApiProperty({ enum: ConversationMemberStatus })
+  status: ConversationMemberStatus;
+
+  @ApiProperty({ enum: ConversationMemberRole })
+  role: ConversationMemberRole;
+
   @ApiProperty()
   notSeenCount: number;
 }

@@ -8,6 +8,7 @@ import { ConversationMember } from '../entities/conversation-member.entity';
 import { UserBlock } from '../entities/user-block.entity';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 
 describe('ConversationPostgresReadRepository', () => {
   let repository: ConversationPostgresReadRepository;
@@ -237,6 +238,7 @@ describe('ConversationPostgresReadRepository', () => {
       });
 
       expect(queryBuilderMock.innerJoin).not.toHaveBeenCalled();
+      expect(queryBuilderMock.innerJoinAndSelect).not.toHaveBeenCalled();
       expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
       expect(queryBuilderMock.where).toHaveBeenCalledWith('c.type = :type', {
         type: ConversationType.GROUP,
@@ -244,7 +246,6 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data).toEqual([
         {
           id: 'group-mine',
-          type: ConversationType.GROUP,
           title: 'My group',
           picture: null,
           createdAt: '2024-01-01T00:00:00.000Z',
@@ -255,7 +256,6 @@ describe('ConversationPostgresReadRepository', () => {
         },
         {
           id: 'group-other',
-          type: ConversationType.GROUP,
           title: 'Another group',
           picture: null,
           createdAt: '2024-01-01T00:00:00.000Z',
@@ -268,6 +268,7 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data[0]).not.toHaveProperty('identifier');
       expect(result.data[0]).not.toHaveProperty('lastMessage');
       expect(result.data[0]).not.toHaveProperty('updatedBy');
+      expect(result.data[0]).not.toHaveProperty('type');
     });
 
     it('should filter groups by title', async () => {
@@ -290,7 +291,7 @@ describe('ConversationPostgresReadRepository', () => {
       );
     });
 
-    it('should filter to groups where the user is an active member', async () => {
+    it('should include groups where the user is an active or pending member', async () => {
       queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
 
       await repository.getUserGroupConversationList(
@@ -305,18 +306,78 @@ describe('ConversationPostgresReadRepository', () => {
         true,
       );
 
-      expect(queryBuilderMock.andWhereExists).toHaveBeenCalled();
-      expect(queryBuilderMock.where).toHaveBeenCalledWith(
-        'cm_joined.conversation_id = c.id',
+      expect(queryBuilderMock.innerJoinAndSelect).toHaveBeenCalledWith(
+        'c.conversationMembers',
+        'cm_joined',
+        'cm_joined.user_id = :userId AND cm_joined.status IN (:...memberStatuses)',
+        {
+          userId: 'user-1',
+          memberStatuses: [
+            ConversationMemberStatus.ACTIVE,
+            ConversationMemberStatus.PENDING,
+          ],
+        },
       );
-      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
-        'cm_joined.user_id = :userId',
-        { userId: 'user-1' },
+      expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
+    });
+
+    it('should map the current user membership status and role', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00.000Z');
+      const updatedAt = new Date('2024-01-02T00:00:00.000Z');
+      queryBuilderMock.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'group-1',
+            type: ConversationType.GROUP,
+            title: 'Team',
+            picture: null,
+            created_by: 'user-2',
+            created_at: createdAt,
+            updated_at: updatedAt,
+            conversationMembers: [
+              {
+                user_id: 'user-1',
+                status: ConversationMemberStatus.PENDING,
+                role: ConversationMemberRole.USER,
+              },
+            ],
+          },
+        ],
+        1,
+      ]);
+      queryBuilderMock.getRawMany
+        .mockResolvedValueOnce([
+          { conversationId: 'group-1', notSeenCount: '0' },
+        ])
+        .mockResolvedValueOnce([
+          { conversationId: 'group-1', memberCount: '3' },
+        ]);
+
+      const result = await repository.getUserGroupConversationList(
+        'user-1',
+        {
+          page: 1,
+          pageSize: 10,
+          limit: 10,
+          offset: 0,
+        },
+        undefined,
+        true,
       );
-      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
-        'cm_joined.status = :active',
-        { active: ConversationMemberStatus.ACTIVE },
-      );
+
+      expect(result.data[0]).toEqual({
+        id: 'group-1',
+        title: 'Team',
+        picture: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T00:00:00.000Z',
+        memberCount: 3,
+        createdByMe: false,
+        notSeenCount: 0,
+        status: ConversationMemberStatus.PENDING,
+        role: ConversationMemberRole.USER,
+      });
+      expect(result.data[0]).not.toHaveProperty('type');
     });
   });
 

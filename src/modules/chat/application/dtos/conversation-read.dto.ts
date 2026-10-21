@@ -28,7 +28,6 @@ export interface ConversationReadDto {
 
 export interface GroupConversationListItemReadDto {
   id: string;
-  type: string;
   title: string | null;
   picture: string | null;
   createdAt: string;
@@ -36,4 +35,6 @@ export interface GroupConversationListItemReadDto {
   memberCount: number;
   createdByMe: boolean;
   notSeenCount: number;
+  status?: ConversationMemberStatus;
+  role?: ConversationMemberRole;
 }

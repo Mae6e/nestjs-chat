@@ -9,6 +9,8 @@ import { ConversationType } from '@modules/chat/domain/enums/conversation-type.e
 import {
   ConversationNotFoundException,
   GroupMemberAlreadyExistsException,
+  GroupMemberLimitExceededException,
+  GroupMemberRequestPendingException,
   NotAGroupConversationException,
 } from '@modules/chat/domain/chat.exceptions';
 
@@ -36,14 +38,18 @@ export class RequestJoinGroupHandler implements ICommandHandler<
       throw new NotAGroupConversationException(conversationId);
     }
 
+    const membersCount = await this.commandRepo.countMembers(conversationId);
+    if (membersCount >= 30) {
+      throw new GroupMemberLimitExceededException(`members: ${membersCount}`);
+    }
+
     const existing = conversation.getMember(userId);
     if (existing?.isActive()) {
       throw new GroupMemberAlreadyExistsException(userId);
     }
 
-    // Same request already pending -> idempotent, return it.
     if (existing?.isPending()) {
-      return existing;
+      throw new GroupMemberRequestPendingException(userId);
     }
 
     let member =

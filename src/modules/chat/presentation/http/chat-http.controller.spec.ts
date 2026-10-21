@@ -18,6 +18,7 @@ import { ConversationRepositoryPort } from '@modules/chat/application/ports/conv
 import { ChatWsGateway } from '@modules/chat/presentation/ws/chat-ws.gateway';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 describe('ChatHttpController', () => {
   let controller: ChatHttpController;
@@ -168,7 +169,14 @@ describe('ChatHttpController', () => {
 
     it('should return stored picture keys as public URLs without notSeenCount', async () => {
       queryBus.execute.mockResolvedValue({
-        data: [{ id: 'group-1', picture: 'picture.png', notSeenCount: 3 }],
+        data: [
+          {
+            id: 'group-1',
+            type: ConversationType.GROUP,
+            picture: 'picture.png',
+            notSeenCount: 3,
+          },
+        ],
         meta: {
           page: 1,
           pageSize: 10,
@@ -189,6 +197,7 @@ describe('ChatHttpController', () => {
       );
       expect(response.data[0]).not.toHaveProperty('updatedBy');
       expect(response.data[0]).not.toHaveProperty('notSeenCount');
+      expect(response.data[0]).not.toHaveProperty('type');
     });
   });
 
@@ -206,6 +215,8 @@ describe('ChatHttpController', () => {
             memberCount: 2,
             createdByMe: true,
             notSeenCount: 4,
+            status: ConversationMemberStatus.ACTIVE,
+            role: ConversationMemberRole.ADMIN,
           },
         ],
         meta: {
@@ -237,6 +248,9 @@ describe('ChatHttpController', () => {
         ),
       );
       expect(response.data[0].notSeenCount).toBe(4);
+      expect(response.data[0].status).toBe(ConversationMemberStatus.ACTIVE);
+      expect(response.data[0].role).toBe(ConversationMemberRole.ADMIN);
+      expect(response.data[0]).not.toHaveProperty('type');
       expect(response.data[0].picture).toBe(
         '/uploads/group-pictures/picture.png',
       );

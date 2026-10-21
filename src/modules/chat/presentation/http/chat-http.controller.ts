@@ -116,7 +116,7 @@ export class ChatHttpController {
   @ApiOperation({
     summary: 'List my group conversations',
     description:
-      'Returns a paginated list of groups where the current user is an active member. Supports the same `search` filter as `GET /v1/chat/group` and additionally returns `notSeenCount`.',
+      'Returns a paginated list of groups where the current user is an active or pending member. Supports the same `search` filter as `GET /v1/chat/group` and additionally returns `notSeenCount`.',
   })
   @ApiOkResponse({ type: MyGroupConversationListBaseResponseDto })
   @ResponseMessage('My groups retrieved successfully')
@@ -453,7 +453,6 @@ export class ChatHttpController {
       ...result,
       data: result.data.map((item) => ({
         id: item.id,
-        type: item.type,
         title: item.title,
         picture: this.fileStorage.getGroupPictureUrl(item.picture),
         createdAt: item.createdAt,
@@ -470,8 +469,16 @@ export class ChatHttpController {
     return {
       ...result,
       data: result.data.map((item) => ({
-        ...item,
+        id: item.id,
+        title: item.title,
         picture: this.fileStorage.getGroupPictureUrl(item.picture),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        memberCount: item.memberCount,
+        createdByMe: item.createdByMe,
+        status: item.status,
+        role: item.role,
+        notSeenCount: item.notSeenCount,
       })),
     };
   }

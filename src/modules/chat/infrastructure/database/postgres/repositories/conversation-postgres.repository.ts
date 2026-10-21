@@ -11,6 +11,7 @@ import { ConversationMemberEntity } from '@modules/chat/domain/models/conversati
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
 import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 @Injectable()
 export class ConversationPostgresRepository implements ConversationRepositoryPort {
@@ -152,6 +153,15 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
     }
 
     return ConversationMember.toDomain(member);
+  }
+
+  async countMembers(
+    conversationId: string,
+    status: ConversationMemberStatus = ConversationMemberStatus.ACTIVE,
+  ): Promise<number> {
+    return this.dataSource.getRepository(ConversationMember).count({
+      where: { conversation_id: conversationId, status },
+    });
   }
 
   async saveMember(

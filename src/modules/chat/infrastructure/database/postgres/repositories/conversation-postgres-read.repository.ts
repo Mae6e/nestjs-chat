@@ -203,7 +203,8 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
   ): Promise<PaginatedResult<GroupConversationListItemReadDto>> {
     // Return every group by default. `userId` is only used to mark ownership
     // (`createdByMe`) and calculate per-user unread counts; it is not a
-    // membership filter unless `joinedOnly` is requested.
+    // membership filter unless `joinedOnly` is requested; `joinedOnly`
+    // includes both active and pending memberships.
     const query = this.conversationRepository
       .createQueryBuilder('c')
       .where('c.type = :type', { type: ConversationType.GROUP })
@@ -219,14 +220,17 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     }
 
     if (joinedOnly) {
-      query.andWhereExists(
-        this.conversationMemberRepository
-          .createQueryBuilder('cm_joined')
-          .where('cm_joined.conversation_id = c.id')
-          .andWhere('cm_joined.user_id = :userId', { userId })
-          .andWhere('cm_joined.status = :active', {
-            active: ConversationMemberStatus.ACTIVE,
-          }),
+      query.innerJoinAndSelect(
+        'c.conversationMembers',
+        'cm_joined',
+        'cm_joined.user_id = :userId AND cm_joined.status IN (:...memberStatuses)',
+        {
+          userId,
+          memberStatuses: [
+            ConversationMemberStatus.ACTIVE,
+            ConversationMemberStatus.PENDING,
+          ],
+        },
       );
     }
 
@@ -264,17 +268,28 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     });
 
     const dtos: GroupConversationListItemReadDto[] = conversations.map(
-      (conv) => ({
-        id: conv.id,
-        type: conv.type,
-        title: conv.title,
-        picture: conv.picture,
-        createdAt: conv.created_at.toISOString(),
-        updatedAt: conv.updated_at.toISOString(),
-        memberCount: memberCountsMap.get(conv.id) ?? 0,
-        createdByMe: conv.created_by === userId,
-        notSeenCount: notSeenCountsMap.get(conv.id) || 0,
-      }),
+      (conv) => {
+        const currentMembership = joinedOnly
+          ? conv.conversationMembers?.find((cm) => cm.user_id === userId)
+          : undefined;
+
+        return {
+          id: conv.id,
+          title: conv.title,
+          picture: conv.picture,
+          createdAt: conv.created_at.toISOString(),
+          updatedAt: conv.updated_at.toISOString(),
+          memberCount: memberCountsMap.get(conv.id) ?? 0,
+          createdByMe: conv.created_by === userId,
+          notSeenCount: notSeenCountsMap.get(conv.id) || 0,
+          ...(currentMembership
+            ? {
+                status: currentMembership.status,
+                role: currentMembership.role,
+              }
+            : {}),
+        };
+      },
     );
 
     return PaginationHelper.createResult(dtos, count, pagination);

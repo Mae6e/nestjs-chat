@@ -20,6 +20,8 @@ export abstract class ConversationRepositoryPort {
     userId: string,
   ): Promise<ConversationMemberEntity | null>;
 
+  abstract countMembers(conversationId: string): Promise<number>;
+
   abstract saveMember(
     member: ConversationMemberEntity,
   ): Promise<ConversationMemberEntity>;
