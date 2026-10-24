@@ -240,6 +240,12 @@ describe('ConversationPostgresReadRepository', () => {
       expect(queryBuilderMock.innerJoin).not.toHaveBeenCalled();
       expect(queryBuilderMock.innerJoinAndSelect).not.toHaveBeenCalled();
       expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
+      expect(queryBuilderMock.leftJoinAndSelect).toHaveBeenCalledWith(
+        'c.conversationMembers',
+        'my_membership',
+        'my_membership.user_id = :userId',
+        { userId: 'user-1' },
+      );
       expect(queryBuilderMock.where).toHaveBeenCalledWith('c.type = :type', {
         type: ConversationType.GROUP,
       });
@@ -253,6 +259,7 @@ describe('ConversationPostgresReadRepository', () => {
           memberCount: 2,
           createdByMe: true,
           notSeenCount: 3,
+          status: null,
         },
         {
           id: 'group-other',
@@ -263,6 +270,7 @@ describe('ConversationPostgresReadRepository', () => {
           memberCount: 4,
           createdByMe: false,
           notSeenCount: 0,
+          status: null,
         },
       ]);
       expect(result.data[0]).not.toHaveProperty('identifier');
@@ -306,18 +314,16 @@ describe('ConversationPostgresReadRepository', () => {
         true,
       );
 
-      expect(queryBuilderMock.innerJoinAndSelect).toHaveBeenCalledWith(
-        'c.conversationMembers',
-        'cm_joined',
-        'cm_joined.user_id = :userId AND cm_joined.status IN (:...memberStatuses)',
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'my_membership.status IN (:...memberStatuses)',
         {
-          userId: 'user-1',
           memberStatuses: [
             ConversationMemberStatus.ACTIVE,
             ConversationMemberStatus.PENDING,
           ],
         },
       );
+      expect(queryBuilderMock.innerJoinAndSelect).not.toHaveBeenCalled();
       expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
     });
 

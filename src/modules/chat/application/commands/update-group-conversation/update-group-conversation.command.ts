@@ -3,6 +3,7 @@ export class UpdateGroupConversationCommand {
     public readonly conversationId: string,
     public readonly actorId: string,
     public readonly title?: string,
+    public readonly description?: string | null,
     public readonly picture?: string | null,
   ) {}
 }

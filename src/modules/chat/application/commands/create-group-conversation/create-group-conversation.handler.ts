@@ -20,7 +20,7 @@ export class CreateGroupConversationHandler implements ICommandHandler<
   async execute(
     command: CreateGroupConversationCommand,
   ): Promise<ConversationEntity> {
-    const { creatorId, picture } = command;
+    const { creatorId, picture, description } = command;
 
     const trimmedTitle = command.title?.trim();
     if (!trimmedTitle) {
@@ -43,6 +43,7 @@ export class CreateGroupConversationHandler implements ICommandHandler<
       trimmedTitle,
       [],
       picture ?? null,
+      description ?? null,
     );
 
     const savedConversation =

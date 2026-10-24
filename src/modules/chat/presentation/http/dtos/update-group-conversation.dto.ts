@@ -16,6 +16,13 @@ export class UpdateGroupConversationHttpRequest {
   @MaxLength(50)
   title?: string;
 
+  @ApiProperty({ example: 'This is for happy girls.', maxLength: 1000 })
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(1000)
+  description?: string;
+
   @ApiPropertyOptional({
     description:
       'Existing group picture file name or public path. Ignored when a picture file is uploaded.',

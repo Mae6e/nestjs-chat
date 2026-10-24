@@ -201,12 +201,18 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     search?: string,
     joinedOnly?: boolean,
   ): Promise<PaginatedResult<GroupConversationListItemReadDto>> {
-    // Return every group by default. `userId` is only used to mark ownership
-    // (`createdByMe`) and calculate per-user unread counts; it is not a
-    // membership filter unless `joinedOnly` is requested; `joinedOnly`
-    // includes both active and pending memberships.
+    // Returns every group by default. The `userId` join picks up the current
+    // user's own membership row (if any) so items can expose `status` without
+    // turning this into a membership filter; `joinedOnly` is the only case
+    // that filters to the user's active/pending memberships.
     const query = this.conversationRepository
       .createQueryBuilder('c')
+      .leftJoinAndSelect(
+        'c.conversationMembers',
+        'my_membership',
+        'my_membership.user_id = :userId',
+        { userId },
+      )
       .where('c.type = :type', { type: ConversationType.GROUP })
       .orderBy('c.updated_at', 'DESC')
       .offset(pagination.offset)
@@ -220,18 +226,12 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     }
 
     if (joinedOnly) {
-      query.innerJoinAndSelect(
-        'c.conversationMembers',
-        'cm_joined',
-        'cm_joined.user_id = :userId AND cm_joined.status IN (:...memberStatuses)',
-        {
-          userId,
-          memberStatuses: [
-            ConversationMemberStatus.ACTIVE,
-            ConversationMemberStatus.PENDING,
-          ],
-        },
-      );
+      query.andWhere('my_membership.status IN (:...memberStatuses)', {
+        memberStatuses: [
+          ConversationMemberStatus.ACTIVE,
+          ConversationMemberStatus.PENDING,
+        ],
+      });
     }
 
     const [conversations, count] = await query.getManyAndCount();
@@ -269,9 +269,9 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
 
     const dtos: GroupConversationListItemReadDto[] = conversations.map(
       (conv) => {
-        const currentMembership = joinedOnly
-          ? conv.conversationMembers?.find((cm) => cm.user_id === userId)
-          : undefined;
+        const myMembership = conv.conversationMembers?.find(
+          (cm) => cm.user_id === userId,
+        );
 
         return {
           id: conv.id,
@@ -282,12 +282,8 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
           memberCount: memberCountsMap.get(conv.id) ?? 0,
           createdByMe: conv.created_by === userId,
           notSeenCount: notSeenCountsMap.get(conv.id) || 0,
-          ...(currentMembership
-            ? {
-                status: currentMembership.status,
-                role: currentMembership.role,
-              }
-            : {}),
+          status: myMembership?.status ?? null,
+          ...(myMembership ? { role: myMembership.role } : {}),
         };
       },
     );

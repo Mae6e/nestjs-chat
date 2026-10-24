@@ -17,6 +17,13 @@ export class CreateGroupConversationHttpRequest {
   @MaxLength(50)
   title: string;
 
+  @ApiProperty({ example: 'This is for happy girls.', maxLength: 1000 })
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(1000)
+  description?: string;
+
   @ApiPropertyOptional({
     description: 'Optional first message sent by the creator.',
   })

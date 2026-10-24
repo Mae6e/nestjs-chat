@@ -90,7 +90,7 @@ export class ChatHttpController {
   @ApiOperation({
     summary: 'List group conversations',
     description:
-      'Returns a paginated list of all groups. Use `search` to filter by group title. `createdByMe` indicates whether the current user created each group.',
+      "Returns a paginated list of all groups. Use `search` to filter by group title. `createdByMe` indicates whether the current user created each group. `status` shows the current user's membership (`ACTIVE`, `PENDING`, `REJECTED`, or `null` when not a member).",
   })
   @ApiOkResponse({ type: GroupConversationListBaseResponseDto })
   @ResponseMessage('Groups retrieved successfully')
@@ -116,7 +116,7 @@ export class ChatHttpController {
   @ApiOperation({
     summary: 'List my group conversations',
     description:
-      'Returns a paginated list of groups where the current user is an active or pending member. Supports the same `search` filter as `GET /v1/chat/group` and additionally returns `notSeenCount`.',
+      'Returns a paginated list of groups where the current user is an active or pending member. Supports the same `search` filter as `GET /v1/chat/group` and additionally returns the membership `status`, `role`, and `notSeenCount`.',
   })
   @ApiOkResponse({ type: MyGroupConversationListBaseResponseDto })
   @ResponseMessage('My groups retrieved successfully')
@@ -152,6 +152,7 @@ export class ChatHttpController {
       properties: {
         title: { type: 'string', example: 'Team' },
         picture: { type: 'string', format: 'binary' },
+        description: { type: 'string', example: 'This is for Happy Girls.' },
         content: { type: 'string', description: 'Optional first message' },
       },
       required: ['title'],
@@ -185,7 +186,12 @@ export class ChatHttpController {
       }
 
       conversation = await this.commandBus.execute(
-        new CreateGroupConversationCommand(authUserId, body.title, picturePath),
+        new CreateGroupConversationCommand(
+          authUserId,
+          body.title,
+          picturePath,
+          body.description,
+        ),
       );
 
       if (body.content?.trim()) {
@@ -253,6 +259,7 @@ export class ChatHttpController {
       properties: {
         title: { type: 'string', example: 'Team' },
         picture: { type: 'string', format: 'binary' },
+        description: { type: 'string', example: 'This is for Happy Girls.' },
         removePicture: {
           type: 'boolean',
           description: 'Set to true to remove the current picture',
@@ -281,6 +288,7 @@ export class ChatHttpController {
 
     if (
       body.title === undefined &&
+      body.description === undefined &&
       pictureFromBody === undefined &&
       !body.removePicture &&
       !pictureFile
@@ -311,6 +319,7 @@ export class ChatHttpController {
           conversationId,
           authUserId,
           body.title,
+          body.description,
           picture,
         ),
       );
@@ -346,13 +355,13 @@ export class ChatHttpController {
       }
     }
 
-    try {
-      await this.broadcastGroupUpdated(conversation);
-    } catch (error) {
-      this.logger.warn(
-        `Failed to broadcast group update for ${conversation.id}: ${(error as Error).message}`,
-      );
-    }
+    // try {
+    //   await this.broadcastGroupUpdated(conversation);
+    // } catch (error) {
+    //   this.logger.warn(
+    //     `Failed to broadcast group update for ${conversation.id}: ${(error as Error).message}`,
+    //   );
+    // }
 
     return {
       id: conversation.id,
@@ -459,6 +468,7 @@ export class ChatHttpController {
         updatedAt: item.updatedAt,
         memberCount: item.memberCount,
         createdByMe: item.createdByMe,
+        status: item.status,
       })),
     };
   }

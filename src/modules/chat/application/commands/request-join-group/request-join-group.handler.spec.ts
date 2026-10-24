@@ -20,6 +20,7 @@ describe('RequestJoinGroupHandler', () => {
     commandRepo = {
       getConversationById: jest.fn(),
       getMembership: jest.fn(),
+      countMembers: jest.fn(async () => 0),
       saveMember: jest.fn(async (member) => member),
     } as any;
 

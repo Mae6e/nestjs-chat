@@ -175,6 +175,7 @@ describe('ChatHttpController', () => {
             type: ConversationType.GROUP,
             picture: 'picture.png',
             notSeenCount: 3,
+            status: ConversationMemberStatus.PENDING,
           },
         ],
         meta: {
@@ -195,6 +196,7 @@ describe('ChatHttpController', () => {
       expect(response.data[0].picture).toBe(
         '/uploads/group-pictures/picture.png',
       );
+      expect(response.data[0].status).toBe(ConversationMemberStatus.PENDING);
       expect(response.data[0]).not.toHaveProperty('updatedBy');
       expect(response.data[0]).not.toHaveProperty('notSeenCount');
       expect(response.data[0]).not.toHaveProperty('type');

@@ -35,6 +35,6 @@ export interface GroupConversationListItemReadDto {
   memberCount: number;
   createdByMe: boolean;
   notSeenCount: number;
-  status?: ConversationMemberStatus;
+  status: ConversationMemberStatus | null;
   role?: ConversationMemberRole;
 }

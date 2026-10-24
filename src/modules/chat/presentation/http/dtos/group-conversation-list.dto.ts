@@ -66,12 +66,17 @@ export class GroupConversationListItemDto {
       'True when the current user created the group; false when another user created it.',
   })
   createdByMe: boolean;
+
+  @ApiPropertyOptional({
+    enum: ConversationMemberStatus,
+    nullable: true,
+    description:
+      'Current user membership status in this group; null when the user is not a member.',
+  })
+  status: ConversationMemberStatus | null;
 }
 
 export class MyGroupConversationListItemDto extends GroupConversationListItemDto {
-  @ApiProperty({ enum: ConversationMemberStatus })
-  status: ConversationMemberStatus;
-
   @ApiProperty({ enum: ConversationMemberRole })
   role: ConversationMemberRole;
 

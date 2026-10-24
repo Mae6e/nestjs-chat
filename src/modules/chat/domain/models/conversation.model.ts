@@ -9,6 +9,7 @@ import { ConversationMemberRole } from '../enums/conversation-member-role.enum';
 export class ConversationEntity extends AggregateRoot<string> {
   private _title: string | null;
   private _picture: string | null;
+  private _description: string | null;
   private readonly _identifier: string | null;
   private readonly _type: ConversationType;
   private readonly _createdBy: string | null;
@@ -75,6 +76,7 @@ export class ConversationEntity extends AggregateRoot<string> {
   public updateInfo(
     title?: string | null,
     picture?: string | null,
+    description?: string | null,
     updatedBy?: string | null,
   ): void {
     if (title !== undefined) {
@@ -82,6 +84,9 @@ export class ConversationEntity extends AggregateRoot<string> {
     }
     if (picture !== undefined) {
       this._picture = picture;
+    }
+    if (description !== undefined) {
+      this._description = description;
     }
     if (updatedBy !== undefined) {
       this._updatedBy = updatedBy;
@@ -113,6 +118,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     type: ConversationType,
     title: string | null = null,
     picture: string | null = null,
+    description: string | null = null,
     identifier: string | null = null,
     createdBy: string | null = null,
     updatedBy: string | null = null,
@@ -122,6 +128,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     this._type = type;
     this._title = title;
     this._picture = picture;
+    this._description = description;
     this._identifier = identifier;
     this._createdBy = createdBy;
     this._updatedBy = updatedBy;
@@ -171,6 +178,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     title: string,
     memberIds: string[] = [],
     picture: string | null = null,
+    description: string | null = null,
   ): ConversationEntity {
     const id = uuidv7();
     const conversation = new ConversationEntity(
@@ -180,6 +188,7 @@ export class ConversationEntity extends AggregateRoot<string> {
       ConversationType.GROUP,
       title,
       picture,
+      description,
       uuidv7(),
       creatorId,
       creatorId,
@@ -214,6 +223,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     type: ConversationType,
     title: string | null,
     picture: string | null,
+    description: string | null,
     identifier: string | null,
     createdAt: Date,
     updatedAt: Date,
@@ -228,6 +238,7 @@ export class ConversationEntity extends AggregateRoot<string> {
       type,
       title,
       picture,
+      description,
       identifier,
       createdBy,
       updatedBy,
@@ -243,6 +254,9 @@ export class ConversationEntity extends AggregateRoot<string> {
   }
   public get picture(): string | null {
     return this._picture;
+  }
+  public get description(): string | null {
+    return this._description;
   }
   public get identifier(): string | null {
     return this._identifier;

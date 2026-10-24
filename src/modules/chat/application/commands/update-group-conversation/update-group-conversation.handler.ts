@@ -23,7 +23,7 @@ export class UpdateGroupConversationHandler implements ICommandHandler<
   async execute(
     command: UpdateGroupConversationCommand,
   ): Promise<ConversationEntity> {
-    const { conversationId, actorId, picture } = command;
+    const { conversationId, actorId, picture, description } = command;
 
     const title =
       command.title === undefined ? undefined : command.title?.trim();
@@ -36,7 +36,21 @@ export class UpdateGroupConversationHandler implements ICommandHandler<
         'Group title must be at most 50 characters long',
       );
     }
-    if (title === undefined && picture === undefined) {
+
+    if (description !== undefined && !description) {
+      throw new ChatDomainError('Group description is required');
+    }
+    if (description !== undefined && description.length > 1000) {
+      throw new ChatDomainError(
+        'Group description must be at most 1000 characters long',
+      );
+    }
+
+    if (
+      title === undefined &&
+      picture === undefined &&
+      description === undefined
+    ) {
       throw new ChatDomainError('Nothing to update');
     }
 
@@ -55,7 +69,7 @@ export class UpdateGroupConversationHandler implements ICommandHandler<
       throw new GroupAdminRequiredException(actorId);
     }
 
-    conversation.updateInfo(title, picture, actorId);
+    conversation.updateInfo(title, picture, description, actorId);
 
     const saved = await this.commandRepo.saveConversation(conversation);
 
