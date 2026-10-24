@@ -12,31 +12,33 @@ services:
       - .env
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
+      - "${WEBSOCKET_PORT:-3001}:${WEBSOCKET_PORT:-3001}"
     volumes:
       - .:/app
       - /app/node_modules
     environment:
-      - POSTGRES_HOST=postgres
+      - POSTGRES_HOST=postgres-chatterbox
       - POSTGRES_PORT=5432
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis-chatterbox
       - REDIS_PORT=6379
     depends_on:
-      postgres:
+      postgres-chatterbox:
         condition: service_healthy
-      redis:
+      redis-chatterbox:
         condition: service_healthy
     networks:
       - chatterbox_net
 
-  postgres:
+  postgres-chatterbox:
     image: postgres:18-alpine
+    container_name: postgres-chatterbox
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DATABASE:-chatterbox}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "7352:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -48,11 +50,12 @@ services:
     networks:
       - chatterbox_net
 
-  redis:
+  redis-chatterbox:
     image: redis:8-alpine
+    container_name: redis-chatterbox
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "7369:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -66,7 +69,9 @@ services:
 
 volumes:
   postgres_data:
+    name: chatterbox_postgres_data
   redis_data:
+    name: chatterbox_redis_data
 
 networks:
   chatterbox_net:
