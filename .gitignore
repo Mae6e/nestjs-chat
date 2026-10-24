@@ -38,6 +38,10 @@ lerna-debug.log*
 # Envirnment files
 **/.env
 
+#Keys
+keys/
+keys/*
+
 # Yarn
 .pnp.*
 .yarn/*
@@ -52,8 +56,3 @@ lerna-debug.log*
 
 #Help
 *.txt
-
-#Keys
-/keys
-keys
-keys/*
