@@ -596,9 +596,7 @@ export class ChatWsGateway
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Group conversations
-  // ---------------------------------------------------------------------------
+  //todo: Group conversations
 
   @SubscribeMessage('conversation.group.join')
   async requestToJoinGroup(
@@ -677,6 +675,7 @@ export class ChatWsGateway
           avatar: user?.avatar,
           role: request.role,
           status: request.status,
+          updatedBy: request.updatedBy,
         };
       });
     }
@@ -939,6 +938,7 @@ export class ChatWsGateway
         avatar: user?.avatar,
         role: member.role,
         status: member.status,
+        updatedBy: member.updatedBy,
       };
     });
   }

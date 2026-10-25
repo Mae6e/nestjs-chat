@@ -201,10 +201,6 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     search?: string,
     joinedOnly?: boolean,
   ): Promise<PaginatedResult<GroupConversationListItemReadDto>> {
-    // Returns every group by default. The `userId` join picks up the current
-    // user's own membership row (if any) so items can expose `status` without
-    // turning this into a membership filter; `joinedOnly` is the only case
-    // that filters to the user's active/pending memberships.
     const query = this.conversationRepository
       .createQueryBuilder('c')
       .leftJoinAndSelect(
@@ -450,6 +446,7 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
           }
         : null,
       lastMessageId: cm.last_message_id,
+      updatedBy: cm.updated_by ?? null,
     };
   }
 

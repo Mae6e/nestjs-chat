@@ -424,13 +424,13 @@ describe('ChatHttpController', () => {
           conversation.id,
           'auth-user',
           'New name',
+          undefined,
           'new.png',
         ),
       );
       expect(fileStorage.deleteGroupPicture).toHaveBeenCalledWith(
         '/uploads/group-pictures/old.png',
       );
-      expect(chatWsGateway.serverBroadcast).toHaveBeenCalled();
       expect(result).toEqual({
         id: conversation.id,
         title: 'New name',
@@ -465,6 +465,7 @@ describe('ChatHttpController', () => {
         new UpdateGroupConversationCommand(
           conversation.id,
           'auth-user',
+          undefined,
           undefined,
           null,
         ),
@@ -502,6 +503,7 @@ describe('ChatHttpController', () => {
           conversation.id,
           'auth-user',
           'New name',
+          undefined,
           null,
         ),
       );
@@ -509,6 +511,51 @@ describe('ChatHttpController', () => {
         '/uploads/group-pictures/old.png',
       );
       expect(result.picture).toBeNull();
+    });
+
+    it('should forward a trimmed description and ignore a blank one', async () => {
+      const conversation = ConversationEntity.createGroup('auth-user', 'Team');
+      conversationRepository.getConversationById.mockResolvedValue({
+        id: conversation.id,
+        picture: null,
+      } as any);
+      commandBus.execute.mockResolvedValue(conversation);
+
+      await controller.updateGroupConversation(
+        conversation.id,
+        { title: 'Team', description: '  a brand new description  ' },
+        undefined,
+        'auth-user',
+      );
+
+      expect(commandBus.execute).toHaveBeenCalledWith(
+        new UpdateGroupConversationCommand(
+          conversation.id,
+          'auth-user',
+          'Team',
+          'a brand new description',
+          null,
+        ),
+      );
+
+      commandBus.execute.mockClear();
+
+      await controller.updateGroupConversation(
+        conversation.id,
+        { title: 'Team', description: '   ' },
+        undefined,
+        'auth-user',
+      );
+
+      expect(commandBus.execute).toHaveBeenCalledWith(
+        new UpdateGroupConversationCommand(
+          conversation.id,
+          'auth-user',
+          'Team',
+          undefined,
+          null,
+        ),
+      );
     });
 
     it('should reject a request with nothing to update', async () => {

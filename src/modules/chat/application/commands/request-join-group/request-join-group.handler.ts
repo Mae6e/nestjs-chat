@@ -6,6 +6,7 @@ import { ConversationMemberEntity } from '@modules/chat/domain/models/conversati
 import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 import {
   ConversationNotFoundException,
   GroupMemberAlreadyExistsException,
@@ -38,11 +39,6 @@ export class RequestJoinGroupHandler implements ICommandHandler<
       throw new NotAGroupConversationException(conversationId);
     }
 
-    const membersCount = await this.commandRepo.countMembers(conversationId);
-    if (membersCount >= 30) {
-      throw new GroupMemberLimitExceededException(`members: ${membersCount}`);
-    }
-
     const existing = conversation.getMember(userId);
     if (existing?.isActive()) {
       throw new GroupMemberAlreadyExistsException(userId);
@@ -50,6 +46,13 @@ export class RequestJoinGroupHandler implements ICommandHandler<
 
     if (existing?.isPending()) {
       throw new GroupMemberRequestPendingException(userId);
+    }
+
+    const membersCount = await this.commandRepo.countMembers(conversationId);
+    if (membersCount >= MAX_GROUP_MEMBERS) {
+      throw new GroupMemberLimitExceededException(
+        `maximum of ${MAX_GROUP_MEMBERS} members reached`,
+      );
     }
 
     let member =

@@ -7,10 +7,12 @@ import { Logger } from '@nestjs/common';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
 import { ConversationMemberEntity } from '@modules/chat/domain/models/conversation-member.model';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 import {
   ConversationNotFoundException,
   GroupAdminRequiredException,
   GroupJoinRequestNotFoundException,
+  GroupMemberLimitExceededException,
   NotAGroupConversationException,
 } from '@modules/chat/domain/chat.exceptions';
 
@@ -49,9 +51,15 @@ export class RespondToJoinRequestHandler implements ICommandHandler<
     }
 
     if (action === GroupJoinRequestAction.APPROVE) {
-      target.approve();
+      const membersCount = await this.commandRepo.countMembers(conversationId);
+      if (membersCount >= MAX_GROUP_MEMBERS) {
+        throw new GroupMemberLimitExceededException(
+          `maximum of ${MAX_GROUP_MEMBERS} members reached`,
+        );
+      }
+      target.approve(actorId);
     } else {
-      target.reject();
+      target.reject(actorId);
     }
 
     const saved = await this.commandRepo.saveMember(target);

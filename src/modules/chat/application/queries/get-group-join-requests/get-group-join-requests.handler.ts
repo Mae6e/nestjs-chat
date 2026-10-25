@@ -5,6 +5,7 @@ import { ConversationReadRepositoryPort } from '@modules/chat/application/ports/
 import { ConversationMemberReadDto } from '@modules/chat/application/dtos/conversation-read.dto';
 import { PaginatedResult } from '@common/pagination/pagination.interface';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import {
   ConversationNotFoundException,
@@ -30,6 +31,7 @@ export class GetGroupJoinRequestsHandler implements IQueryHandler<
       conversationId,
       userId,
     );
+
     if (!conversation) {
       throw new ConversationNotFoundException();
     }
@@ -38,7 +40,11 @@ export class GetGroupJoinRequestsHandler implements IQueryHandler<
       throw new NotAGroupConversationException(conversationId);
     }
 
-    const currentMember = conversation.members.find((m) => m.userId === userId);
+    const currentMember = conversation.members.find(
+      (member) =>
+        member.userId === userId &&
+        member.status === ConversationMemberStatus.ACTIVE,
+    );
     if (currentMember?.role !== ConversationMemberRole.ADMIN) {
       throw new GroupAdminRequiredException(userId);
     }

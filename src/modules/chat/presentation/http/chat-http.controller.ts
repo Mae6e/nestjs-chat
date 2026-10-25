@@ -319,7 +319,7 @@ export class ChatHttpController {
           conversationId,
           authUserId,
           body.title,
-          body.description,
+          body.description || null,
           picture,
         ),
       );

@@ -62,4 +62,21 @@ describe('ConversationMemberEntity', () => {
     member.restore();
     expect(member.deletedAt).toBeUndefined();
   });
+
+  it('should record the admin who approved or rejected the request', () => {
+    const member = ConversationMemberEntity.create(
+      'u-1',
+      'c-1',
+      ConversationMemberRole.USER,
+      ConversationMemberStatus.PENDING,
+    );
+
+    member.approve('admin-1');
+    expect(member.status).toBe(ConversationMemberStatus.ACTIVE);
+    expect(member.updatedBy).toBe('admin-1');
+
+    member.reject('admin-2');
+    expect(member.status).toBe(ConversationMemberStatus.REJECTED);
+    expect(member.updatedBy).toBe('admin-2');
+  });
 });

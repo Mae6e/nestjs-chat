@@ -59,6 +59,70 @@ describe('UpdateGroupConversationHandler', () => {
     expect(result.updatedBy).toBe('admin-2');
   });
 
+  it('preserves the existing description when the command has none', async () => {
+    const conversation = ConversationEntity.createGroup(
+      'admin-1',
+      'Old name',
+      [],
+      null,
+      'Existing description',
+    );
+
+    conversationRepository.getConversationById.mockResolvedValue(conversation);
+    conversationRepository.saveConversation.mockImplementation(
+      async (item) => item,
+    );
+
+    const result = await handler.execute(
+      new UpdateGroupConversationCommand(
+        conversation.id,
+        'admin-1',
+        'New name',
+      ),
+    );
+
+    expect(result.title).toBe('New name');
+    expect(result.description).toBe('Existing description');
+
+    const resultWithNull = await handler.execute(
+      new UpdateGroupConversationCommand(
+        conversation.id,
+        'admin-1',
+        'Newer name',
+        null,
+      ),
+    );
+
+    expect(resultWithNull.title).toBe('Newer name');
+    expect(resultWithNull.description).toBe('Existing description');
+  });
+
+  it('updates and trims the description when it is provided', async () => {
+    const conversation = ConversationEntity.createGroup(
+      'admin-1',
+      'Old name',
+      [],
+      null,
+      'Old description',
+    );
+
+    conversationRepository.getConversationById.mockResolvedValue(conversation);
+    conversationRepository.saveConversation.mockImplementation(
+      async (item) => item,
+    );
+
+    const result = await handler.execute(
+      new UpdateGroupConversationCommand(
+        conversation.id,
+        'admin-1',
+        undefined,
+        '  New description  ',
+      ),
+    );
+
+    expect(result.description).toBe('New description');
+  });
+
   it('rejects an active non-admin member', async () => {
     const conversation = ConversationEntity.createGroup('admin-1', 'Old name');
     conversation.addMember(

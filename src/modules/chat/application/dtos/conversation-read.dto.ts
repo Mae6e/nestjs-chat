@@ -10,6 +10,7 @@ export interface ConversationMemberReadDto {
   lastSeenMessageId: string | null;
   lastSeenMessage: { createdAt: string } | null;
   lastMessageId: string | null;
+  updatedBy: string | null;
 }
 
 export interface ConversationReadDto {

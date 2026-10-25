@@ -53,6 +53,9 @@ export class ConversationMember {
   @Column({ type: 'uuid', nullable: true })
   last_message_id: string;
 
+  @Column({ type: 'char', length: 24, nullable: true })
+  updated_by: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 
@@ -94,6 +97,7 @@ export class ConversationMember {
     conversationMember.conversation_id = entity.conversationId;
     conversationMember.last_seen_message_id = entity.lastSeenMessageId;
     conversationMember.last_message_id = entity.lastMessageId;
+    conversationMember.updated_by = entity.updatedBy;
     conversationMember.created_at = entity.createdAt;
     conversationMember.updated_at = entity.updatedAt;
     conversationMember.deleted_at = entity.deletedAt;
@@ -117,6 +121,7 @@ export class ConversationMember {
       conversationMember.created_at,
       conversationMember.updated_at,
       conversationMember.deleted_at,
+      conversationMember.updated_by ?? null,
     );
 
     if (conversationMember.conversation) {

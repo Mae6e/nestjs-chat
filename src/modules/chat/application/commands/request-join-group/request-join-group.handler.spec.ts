@@ -9,8 +9,10 @@ import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-
 import {
   ConversationNotFoundException,
   GroupMemberAlreadyExistsException,
+  GroupMemberLimitExceededException,
   NotAGroupConversationException,
 } from '@modules/chat/domain/chat.exceptions';
+import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 
 describe('RequestJoinGroupHandler', () => {
   let handler: RequestJoinGroupHandler;
@@ -96,5 +98,18 @@ describe('RequestJoinGroupHandler', () => {
     await expect(
       handler.execute(new RequestJoinGroupCommand(conversation.id, 'user-2')),
     ).rejects.toThrow(GroupMemberAlreadyExistsException);
+  });
+
+  it('throws when the group has reached the member limit', async () => {
+    const conversation = ConversationEntity.createGroup('admin', 'Team');
+    commandRepo.getConversationById.mockResolvedValue(conversation);
+    commandRepo.getMembership.mockResolvedValue(null);
+    commandRepo.countMembers.mockResolvedValue(MAX_GROUP_MEMBERS);
+
+    await expect(
+      handler.execute(new RequestJoinGroupCommand(conversation.id, 'user-2')),
+    ).rejects.toThrow(GroupMemberLimitExceededException);
+
+    expect(commandRepo.saveMember).not.toHaveBeenCalled();
   });
 });

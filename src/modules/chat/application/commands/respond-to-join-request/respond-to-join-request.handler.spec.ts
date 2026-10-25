@@ -12,7 +12,9 @@ import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversatio
 import {
   GroupAdminRequiredException,
   GroupJoinRequestNotFoundException,
+  GroupMemberLimitExceededException,
 } from '@modules/chat/domain/chat.exceptions';
+import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 
 describe('RespondToJoinRequestHandler', () => {
   let handler: RespondToJoinRequestHandler;
@@ -34,6 +36,7 @@ describe('RespondToJoinRequestHandler', () => {
   beforeEach(async () => {
     commandRepo = {
       getConversationById: jest.fn(),
+      countMembers: jest.fn(async () => 0),
       saveMember: jest.fn(async (member) => member),
     } as any;
 
@@ -78,6 +81,7 @@ describe('RespondToJoinRequestHandler', () => {
 
     expect(member.status).toBe(ConversationMemberStatus.ACTIVE);
     expect(member.isActive()).toBe(true);
+    expect(member.updatedBy).toBe('admin');
   });
 
   it('rejects a pending join request', async () => {
@@ -94,6 +98,7 @@ describe('RespondToJoinRequestHandler', () => {
     );
 
     expect(member.status).toBe(ConversationMemberStatus.REJECTED);
+    expect(member.updatedBy).toBe('admin');
   });
 
   it('throws when there is no pending request', async () => {
@@ -110,5 +115,24 @@ describe('RespondToJoinRequestHandler', () => {
         ),
       ),
     ).rejects.toThrow(GroupJoinRequestNotFoundException);
+  });
+
+  it('throws when approving would exceed the group member limit', async () => {
+    const conversation = buildGroupWithPending();
+    commandRepo.getConversationById.mockResolvedValue(conversation);
+    commandRepo.countMembers.mockResolvedValue(MAX_GROUP_MEMBERS);
+
+    await expect(
+      handler.execute(
+        new RespondToJoinRequestCommand(
+          conversation.id,
+          'admin',
+          'user-2',
+          GroupJoinRequestAction.APPROVE,
+        ),
+      ),
+    ).rejects.toThrow(GroupMemberLimitExceededException);
+
+    expect(commandRepo.saveMember).not.toHaveBeenCalled();
   });
 });

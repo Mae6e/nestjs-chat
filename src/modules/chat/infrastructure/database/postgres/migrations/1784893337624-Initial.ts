@@ -62,6 +62,10 @@ export class Initial1784893337624 implements MigrationInterface {
     await queryRunner.query(
       `CREATE TABLE "chat"."user_blocks" ("blocker_id" char(24) NOT NULL, "blocked_id" char(24) NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_48667515438e7d0f0fed998b193" PRIMARY KEY ("blocker_id", "blocked_id"))`,
     );
+
+    await queryRunner.query(
+      `CREATE INDEX "messages_conversation_id_id_idx" ON "chat"."messages" ("conversation_id", "id")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -112,5 +116,9 @@ export class Initial1784893337624 implements MigrationInterface {
       `ALTER TABLE "chat"."user_blocks" DROP CONSTRAINT "FK_dfcd8a81016d1de587fbd2d70bf"`,
     );
     await queryRunner.query(`DROP TABLE "chat"."user_blocks"`);
+
+    await queryRunner.query(
+      `DROP INDEX "chat"."messages_conversation_id_id_idx"`,
+    );
   }
 }

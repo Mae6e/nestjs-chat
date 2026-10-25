@@ -23,28 +23,7 @@ export class UpdateGroupConversationHandler implements ICommandHandler<
   async execute(
     command: UpdateGroupConversationCommand,
   ): Promise<ConversationEntity> {
-    const { conversationId, actorId, picture, description } = command;
-
-    const title =
-      command.title === undefined ? undefined : command.title?.trim();
-
-    if (title !== undefined && !title) {
-      throw new ChatDomainError('Group title is required');
-    }
-    if (title !== undefined && title.length > 50) {
-      throw new ChatDomainError(
-        'Group title must be at most 50 characters long',
-      );
-    }
-
-    if (description !== undefined && !description) {
-      throw new ChatDomainError('Group description is required');
-    }
-    if (description !== undefined && description.length > 1000) {
-      throw new ChatDomainError(
-        'Group description must be at most 1000 characters long',
-      );
-    }
+    const { conversationId, title, actorId, picture, description } = command;
 
     if (
       title === undefined &&

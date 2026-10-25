@@ -22,6 +22,7 @@ describe('ConversationEntity', () => {
       ConversationType.DIRECT,
       'title',
       'pic',
+      null,
       'ident',
       date,
       date,
@@ -44,6 +45,7 @@ describe('ConversationEntity', () => {
     const conv = ConversationEntity.reconstruct(
       'c-1',
       ConversationType.DIRECT,
+      null,
       null,
       null,
       null,
@@ -116,11 +118,26 @@ describe('ConversationEntity', () => {
 
     it('should update group info', () => {
       const conv = ConversationEntity.createGroup('creator', 'Team');
-      conv.updateInfo('New team', 'pic.png', 'admin-2');
+      conv.updateInfo('New team', 'pic.png', null, 'admin-2');
 
       expect(conv.title).toBe('New team');
       expect(conv.picture).toBe('pic.png');
+      expect(conv.description).toBeNull();
       expect(conv.updatedBy).toBe('admin-2');
+    });
+
+    it('should keep the description when updateInfo is called without one', () => {
+      const conv = ConversationEntity.createGroup(
+        'creator',
+        'Team',
+        [],
+        null,
+        'Existing description',
+      );
+
+      conv.updateInfo('New team', 'pic.png', undefined, 'admin-2');
+
+      expect(conv.description).toBe('Existing description');
     });
 
     it('should remove members using a soft delete', () => {

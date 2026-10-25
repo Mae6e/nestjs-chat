@@ -7,10 +7,12 @@ import { ConversationMemberEntity } from '@modules/chat/domain/models/conversati
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 import {
   ChatDomainError,
   ConversationNotFoundException,
   GroupAdminRequiredException,
+  GroupMemberLimitExceededException,
   NotAGroupConversationException,
   TargetUserNotFoundException,
 } from '@modules/chat/domain/chat.exceptions';
@@ -63,6 +65,16 @@ export class AddGroupMembersHandler implements ICommandHandler<
     }
 
     const added: ConversationMemberEntity[] = [];
+
+    const usersToAdd = userIds.filter(
+      (userId) => !conversation.getMember(userId)?.isActive(),
+    );
+    const membersCount = await this.commandRepo.countMembers(conversationId);
+    if (membersCount + usersToAdd.length > MAX_GROUP_MEMBERS) {
+      throw new GroupMemberLimitExceededException(
+        `maximum of ${MAX_GROUP_MEMBERS} members reached`,
+      );
+    }
 
     for (const userId of userIds) {
       const existing = conversation.getMember(userId);
