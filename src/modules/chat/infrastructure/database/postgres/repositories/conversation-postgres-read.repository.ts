@@ -356,7 +356,6 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
   ): Promise<ConversationMemberReadDto[]> {
     const query = this.conversationMemberRepository
       .createQueryBuilder('cm')
-      .leftJoinAndSelect('cm.lastSeenMessage', 'lastSeenMessage')
       .where('cm.conversation_id = :conversationId', { conversationId });
 
     if (status) {
@@ -364,9 +363,7 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     }
 
     query.orderBy('cm.created_at', 'ASC');
-
     const members = await query.getMany();
-
     return members.map((m) => this.mapMemberToDto(m));
   }
 

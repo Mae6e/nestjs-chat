@@ -45,7 +45,11 @@ export class GetGroupJoinRequestsHandler implements IQueryHandler<
         member.userId === userId &&
         member.status === ConversationMemberStatus.ACTIVE,
     );
-    if (currentMember?.role !== ConversationMemberRole.ADMIN) {
+    if (
+      ![ConversationMemberRole.ADMIN, ConversationMemberRole.OWNER].includes(
+        currentMember?.role,
+      )
+    ) {
       throw new GroupAdminRequiredException(userId);
     }
 

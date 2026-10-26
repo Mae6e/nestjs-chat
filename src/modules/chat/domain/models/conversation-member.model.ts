@@ -147,7 +147,15 @@ export class ConversationMemberEntity extends Entity<string> {
   }
 
   public isAdmin(): boolean {
-    return this._role === ConversationMemberRole.ADMIN && this.isActive();
+    return (
+      (this._role === ConversationMemberRole.OWNER ||
+        this._role === ConversationMemberRole.ADMIN) &&
+      this.isActive()
+    );
+  }
+
+  public isOwner(): boolean {
+    return this._role === ConversationMemberRole.OWNER && this.isActive();
   }
 
   public isActive(): boolean {

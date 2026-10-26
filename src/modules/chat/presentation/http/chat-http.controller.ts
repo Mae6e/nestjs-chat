@@ -214,7 +214,7 @@ export class ChatHttpController {
       type: ConversationType.GROUP,
       title: conversation.title,
       picture: this.fileStorage.getGroupPictureUrl(conversation.picture),
-      role: ConversationMemberRole.ADMIN,
+      role: ConversationMemberRole.OWNER,
       createdAt: conversation.createdAt.toISOString(),
     };
   }

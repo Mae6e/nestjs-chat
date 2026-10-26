@@ -198,7 +198,7 @@ export class ConversationEntity extends AggregateRoot<string> {
       ConversationMemberEntity.create(
         creatorId,
         id,
-        ConversationMemberRole.ADMIN,
+        ConversationMemberRole.OWNER,
       ),
     );
 

@@ -770,6 +770,7 @@ export class ChatWsGateway
     };
   }
 
+  //! didnot test that
   @SubscribeMessage('conversation.group.member.add')
   async addGroupMembers(
     @ConnectedSocket() client: Socket,
@@ -917,10 +918,9 @@ export class ChatWsGateway
   @SubscribeMessage('conversation.group.members')
   async getGroupMembers(
     @MessageBody() data: GroupConversationRequest,
-    @CurrentUserId() authUserId: string,
   ): Promise<any> {
     const members = await this.queryBus.execute(
-      new GetGroupMembersQuery(data.conversationId, authUserId),
+      new GetGroupMembersQuery(data.conversationId),
     );
 
     const users = await this.userIntegrationPort.getUsersByIds(
@@ -937,8 +937,6 @@ export class ChatWsGateway
         avatarIndex: user?.avatarIndex,
         avatar: user?.avatar,
         role: member.role,
-        status: member.status,
-        updatedBy: member.updatedBy,
       };
     });
   }
