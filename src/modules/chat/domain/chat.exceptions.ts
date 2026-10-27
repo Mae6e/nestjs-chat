@@ -202,6 +202,42 @@ export class InvalidCredentialsException extends DomainException {
   }
 }
 
+export class GroupMemberRoleUnchangedException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group member role is unchanged: ${reason}`
+        : 'Group member already has this role',
+      'CHAT_GROUP_MEMBER_ROLE_UNCHANGED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupOwnerRoleCannotBeChangedException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group owner role cannot be changed: ${reason}`
+        : 'Group owner role cannot be changed',
+      'CHAT_GROUP_OWNER_ROLE_CANNOT_BE_CHANGED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupMemberCannotChangeOwnRoleException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group member cannot change their own role: ${reason}`
+        : 'Group member cannot change their own role',
+      'CHAT_GROUP_MEMBER_CANNOT_CHANGE_OWN_ROLE',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
 export class UserDomainError extends DomainException {
   constructor(message: string) {
     super(message, 'USER_DOMAIN_ERROR', 'BUSINESS_RULE');

@@ -221,8 +221,16 @@ export class ConversationMemberEntity extends Entity<string> {
     this.updatedAt = new Date();
   }
 
-  public changeRole(role: ConversationMemberRole): void {
+  public changeRole(
+    role: ConversationMemberRole,
+    updatedBy?: string | null,
+  ): void {
     this._role = role;
+    if (updatedBy !== undefined) {
+      this._updatedBy = updatedBy;
+    } else {
+      this._updatedBy = null;
+    }
     this.updatedAt = new Date();
   }
 

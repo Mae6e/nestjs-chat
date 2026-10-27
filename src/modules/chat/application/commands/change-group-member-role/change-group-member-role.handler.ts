@@ -9,7 +9,10 @@ import {
   ChatDomainError,
   ConversationNotFoundException,
   GroupAdminRequiredException,
+  GroupMemberCannotChangeOwnRoleException,
   GroupMemberNotFoundException,
+  GroupMemberRoleUnchangedException,
+  GroupOwnerRoleCannotBeChangedException,
   LastGroupAdminException,
   NotAGroupConversationException,
 } from '@modules/chat/domain/chat.exceptions';
@@ -56,23 +59,29 @@ export class ChangeGroupMemberRoleHandler implements ICommandHandler<
       throw new GroupMemberNotFoundException(targetUserId);
     }
 
-    if (
-      ![ConversationMemberRole.USER, ConversationMemberRole.ADMIN].includes(
-        role,
-      )
-    ) {
-      throw new ChatDomainError(`Unsupported member role: ${role}`);
+    if (target.role === ConversationMemberRole.OWNER) {
+      throw new GroupOwnerRoleCannotBeChangedException();
+    }
+
+    if (target.role === role) {
+      throw new GroupMemberRoleUnchangedException();
+    }
+
+    if (targetUserId === actorId) {
+      throw new GroupMemberCannotChangeOwnRoleException();
     }
 
     if (
-      target.role === ConversationMemberRole.ADMIN &&
+      [(ConversationMemberRole.OWNER, ConversationMemberRole.ADMIN)].includes(
+        target.role,
+      ) &&
       role === ConversationMemberRole.USER &&
       conversation.getAdmins().length <= 1
     ) {
       throw new LastGroupAdminException(targetUserId);
     }
 
-    target.changeRole(role);
+    target.changeRole(role, actorId);
 
     const saved = await this.commandRepo.saveMember(target);
 
