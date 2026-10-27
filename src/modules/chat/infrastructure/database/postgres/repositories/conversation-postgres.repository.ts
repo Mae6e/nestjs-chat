@@ -182,17 +182,30 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
   async softDeleteMember(
     conversationId: string,
     userId: string,
+    deletedBy: string | null = null,
   ): Promise<boolean> {
-    const res = await this.dataSource
-      .getRepository(ConversationMember)
-      .createQueryBuilder()
-      .softDelete()
-      .from(ConversationMember)
-      .where('conversation_id = :conversationId', { conversationId })
-      .andWhere('user_id = :userId', { userId })
-      .execute();
+    return this.dataSource.transaction(async (entityManager) => {
+      const memberRepository = entityManager.getRepository(ConversationMember);
 
-    return res.affected !== 0;
+      const res = await memberRepository
+        .createQueryBuilder()
+        .softDelete()
+        .from(ConversationMember)
+        .where('conversation_id = :conversationId', { conversationId })
+        .andWhere('user_id = :userId', { userId })
+        .execute();
+
+      if (res.affected === 0) {
+        return false;
+      }
+
+      await memberRepository.update(
+        { conversation_id: conversationId, user_id: userId },
+        { deleted_by: deletedBy },
+      );
+
+      return true;
+    });
   }
 
   async block(blockerId: string, blockedId: string): Promise<boolean> {

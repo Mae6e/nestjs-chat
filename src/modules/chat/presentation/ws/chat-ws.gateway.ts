@@ -732,26 +732,25 @@ export class ChatWsGateway
     const isApprove = action === GroupJoinRequestAction.APPROVE;
 
     if (isApprove) {
-      const conversations =
-        await this.conversationRepository.getConversationById(
-          data.conversationId,
-        );
-
-      const rooms = [
-        `user-${data.userId}`,
-        ...(conversations?.getActiveMembers() ?? []).map(
-          (m) => `user-${m.userId}`,
-        ),
-      ];
-
-      await this.broadcast(
-        client,
-        Array.from(new Set(rooms)),
-        new GroupJoinApprovedEvent({
-          conversationId: data.conversationId,
-          userId: data.userId,
-        }),
-      );
+      //todo: broadcast to room
+      // const conversations =
+      //   await this.conversationRepository.getConversationById(
+      //     data.conversationId,
+      //   );
+      // const rooms = [
+      //   `user-${data.userId}`,
+      //   ...(conversations?.getActiveMembers() ?? []).map(
+      //     (m) => `user-${m.userId}`,
+      //   ),
+      // ];
+      // await this.broadcast(
+      //   client,
+      //   Array.from(new Set(rooms)),
+      //   new GroupJoinApprovedEvent({
+      //     conversationId: data.conversationId,
+      //     userId: data.userId,
+      //   }),
+      // );
     } else {
       await this.broadcast(
         client,
@@ -826,6 +825,8 @@ export class ChatWsGateway
       ),
     );
 
+    //todo: broadcast to room
+
     const rooms = [
       `user-${data.userId}`,
       ...(conversationBefore?.getActiveMembers() ?? [])
@@ -895,24 +896,45 @@ export class ChatWsGateway
         data.conversationId,
       );
 
-    await this.commandBus.execute(
+    const result = await this.commandBus.execute(
       new LeaveGroupCommand(data.conversationId, authUserId),
     );
 
-    const rooms = (conversationBefore?.getActiveMembers() ?? []).map(
-      (member) => `user-${member.userId}`,
-    );
+    // The leaving member was the last one, so the group no longer exists.
+    if (!result.conversationDeleted) {
+      const rooms = (conversationBefore?.getActiveMembers() ?? []).map(
+        (member) => `user-${member.userId}`,
+      );
 
-    await this.broadcast(
-      client,
-      rooms,
-      new GroupLeftEvent({
-        conversationId: data.conversationId,
-        userId: authUserId,
-      }),
-    );
+      // The last admin left: tell the group who the new admin is.
+      if (result.promotedAdminId) {
+        await this.broadcast(
+          client,
+          rooms,
+          new GroupMemberRoleChangedEvent({
+            conversationId: data.conversationId,
+            userId: result.promotedAdminId,
+            role: ConversationMemberRole.ADMIN,
+          }),
+        );
+      }
 
-    return { conversationId: data.conversationId, userId: authUserId };
+      await this.broadcast(
+        client,
+        rooms,
+        new GroupLeftEvent({
+          conversationId: data.conversationId,
+          userId: authUserId,
+        }),
+      );
+    }
+
+    return {
+      conversationId: data.conversationId,
+      userId: authUserId,
+      promotedAdminId: result.promotedAdminId,
+      conversationDeleted: result.conversationDeleted,
+    };
   }
 
   @SubscribeMessage('conversation.group.members')

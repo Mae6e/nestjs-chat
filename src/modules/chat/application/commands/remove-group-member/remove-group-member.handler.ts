@@ -5,9 +5,11 @@ import { ConversationRepositoryPort } from '@modules/chat/application/ports/conv
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 import {
+  CannotRemoveSelfException,
   ConversationNotFoundException,
   GroupAdminRequiredException,
   GroupMemberNotFoundException,
+  GroupOwnerCannotBeRemovedException,
   LastGroupAdminException,
   NotAGroupConversationException,
 } from '@modules/chat/domain/chat.exceptions';
@@ -39,17 +41,31 @@ export class RemoveGroupMemberHandler implements ICommandHandler<
       throw new GroupAdminRequiredException(actorId);
     }
 
+    if (targetUserId === actorId) {
+      throw new CannotRemoveSelfException(actorId);
+    }
+
     const target = conversation.getMember(targetUserId);
     if (!target?.isActive()) {
       throw new GroupMemberNotFoundException(targetUserId);
     }
 
+    if (target.role === ConversationMemberRole.OWNER) {
+      throw new GroupOwnerCannotBeRemovedException(targetUserId);
+    }
+
     const activeAdmins = conversation
       .getActiveMembers()
-      .filter((m) => m.role === ConversationMemberRole.ADMIN);
+      .filter((m) =>
+        [ConversationMemberRole.OWNER, ConversationMemberRole.ADMIN].includes(
+          m.role,
+        ),
+      );
 
     if (
-      target.role === ConversationMemberRole.ADMIN &&
+      [ConversationMemberRole.OWNER, ConversationMemberRole.ADMIN].includes(
+        target.role,
+      ) &&
       activeAdmins.length <= 1
     ) {
       throw new LastGroupAdminException(targetUserId);
@@ -58,6 +74,7 @@ export class RemoveGroupMemberHandler implements ICommandHandler<
     const removed = await this.commandRepo.softDeleteMember(
       conversationId,
       targetUserId,
+      actorId,
     );
 
     this.logger.log(

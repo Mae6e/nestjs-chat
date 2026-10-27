@@ -57,6 +57,14 @@ export class ChangeGroupMemberRoleHandler implements ICommandHandler<
     }
 
     if (
+      ![ConversationMemberRole.USER, ConversationMemberRole.ADMIN].includes(
+        role,
+      )
+    ) {
+      throw new ChatDomainError(`Unsupported member role: ${role}`);
+    }
+
+    if (
       target.role === ConversationMemberRole.ADMIN &&
       role === ConversationMemberRole.USER &&
       conversation.getAdmins().length <= 1

@@ -138,6 +138,30 @@ export class LastGroupAdminException extends DomainException {
   }
 }
 
+export class GroupOwnerCannotBeRemovedException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group owner cannot be removed: ${reason}`
+        : 'Group owner cannot be removed',
+      'CHAT_GROUP_OWNER_CANNOT_BE_REMOVED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class CannotRemoveSelfException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `You cannot remove yourself from the group: ${reason}`
+        : 'You cannot remove yourself from the group',
+      'CHAT_CANNOT_REMOVE_SELF',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
 export class ChatDomainError extends DomainException {
   constructor(message: string) {
     super(message, 'CHAT_DOMAIN_ERROR', 'BUSINESS_RULE');

@@ -14,6 +14,7 @@ export class ConversationMemberEntity extends Entity<string> {
   private _lastMessageId?: string;
   private _updatedBy: string | null;
   private _deletedAt?: Date;
+  private _deletedBy: string | null;
 
   // Transient properties
   private _conversation?: Partial<ConversationEntity>;
@@ -59,6 +60,7 @@ export class ConversationMemberEntity extends Entity<string> {
     lastMessageId?: string,
     deletedAt?: Date,
     updatedBy: string | null = null,
+    deletedBy: string | null = null,
   ) {
     super(id, createdAt, updatedAt);
     this._userId = userId;
@@ -69,6 +71,7 @@ export class ConversationMemberEntity extends Entity<string> {
     this._lastMessageId = lastMessageId;
     this._deletedAt = deletedAt;
     this._updatedBy = updatedBy;
+    this._deletedBy = deletedBy;
   }
 
   public static create(
@@ -90,6 +93,7 @@ export class ConversationMemberEntity extends Entity<string> {
       undefined,
       undefined,
       updatedBy,
+      null,
     );
   }
 
@@ -105,6 +109,7 @@ export class ConversationMemberEntity extends Entity<string> {
     updatedAt: Date,
     deletedAt?: Date,
     updatedBy: string | null = null,
+    deletedBy: string | null = null,
   ): ConversationMemberEntity {
     return new ConversationMemberEntity(
       id,
@@ -118,6 +123,7 @@ export class ConversationMemberEntity extends Entity<string> {
       lastMessageId,
       deletedAt,
       updatedBy,
+      deletedBy,
     );
   }
 
@@ -144,6 +150,9 @@ export class ConversationMemberEntity extends Entity<string> {
   }
   public get deletedAt(): Date | undefined {
     return this._deletedAt;
+  }
+  public get deletedBy(): string | null {
+    return this._deletedBy;
   }
 
   public isAdmin(): boolean {
@@ -180,6 +189,7 @@ export class ConversationMemberEntity extends Entity<string> {
   public activate(): void {
     this._status = ConversationMemberStatus.ACTIVE;
     this._deletedAt = undefined;
+    this._deletedBy = null;
     this.updatedAt = new Date();
   }
 
@@ -189,12 +199,14 @@ export class ConversationMemberEntity extends Entity<string> {
   public requestToJoin(): void {
     this._status = ConversationMemberStatus.PENDING;
     this._deletedAt = undefined;
+    this._deletedBy = null;
     this.updatedAt = new Date();
   }
 
   public approve(updatedBy?: string | null): void {
     this._status = ConversationMemberStatus.ACTIVE;
     this._deletedAt = undefined;
+    this._deletedBy = null;
     if (updatedBy !== undefined) {
       this._updatedBy = updatedBy;
     }
@@ -224,13 +236,15 @@ export class ConversationMemberEntity extends Entity<string> {
     this.updatedAt = new Date();
   }
 
-  public softDelete(): void {
+  public softDelete(deletedBy?: string | null): void {
     this._deletedAt = new Date();
+    this._deletedBy = deletedBy ?? null;
     this.updatedAt = new Date();
   }
 
   public restore(): void {
     this._deletedAt = undefined;
+    this._deletedBy = null;
     this.updatedAt = new Date();
   }
 }

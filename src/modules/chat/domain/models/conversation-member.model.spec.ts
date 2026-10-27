@@ -56,11 +56,13 @@ describe('ConversationMemberEntity', () => {
     member.updateLastMessage('new-last');
     expect(member.lastMessageId).toBe('new-last');
 
-    member.softDelete();
+    member.softDelete('admin-1');
     expect(member.deletedAt).toBeDefined();
+    expect(member.deletedBy).toBe('admin-1');
 
     member.restore();
     expect(member.deletedAt).toBeUndefined();
+    expect(member.deletedBy).toBeNull();
   });
 
   it('should record the admin who approved or rejected the request', () => {

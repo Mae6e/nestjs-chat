@@ -29,6 +29,7 @@ export abstract class ConversationRepositoryPort {
   abstract softDeleteMember(
     conversationId: string,
     userId: string,
+    deletedBy?: string | null,
   ): Promise<boolean>;
   abstract getBlockStatus(
     blockerId: string,
