@@ -431,7 +431,7 @@ export class ChatHttpController {
       throw new ConflictException('User is already blocked');
     }
 
-    return {};
+    return null;
   }
 
   @ApiOperation({
@@ -452,7 +452,7 @@ export class ChatHttpController {
       new UnblockUserCommand(authUserId, params.targetUserId),
     );
 
-    return {};
+    return null;
   }
 
   private mapGroupConversationListResponse(
