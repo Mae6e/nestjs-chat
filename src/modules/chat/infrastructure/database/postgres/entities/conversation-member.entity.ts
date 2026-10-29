@@ -59,13 +59,13 @@ export class ConversationMember {
   @Column({ type: 'char', length: 24, nullable: true })
   deleted_by: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
-  @DeleteDateColumn()
+  @DeleteDateColumn({ type: 'timestamptz' })
   deleted_at: Date | null;
 
   @ManyToOne(() => Conversation, (c) => c.conversationMembers, {

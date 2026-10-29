@@ -14,12 +14,12 @@ export class UserBlock {
   @PrimaryColumn({ type: 'char', length: 24 })
   blocked_id: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn({ type: 'timestamp' })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
-  @DeleteDateColumn({ type: 'timestamp' })
+  @DeleteDateColumn({ type: 'timestamptz' })
   deleted_at: Date | null;
 }

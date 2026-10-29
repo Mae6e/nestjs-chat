@@ -441,6 +441,28 @@ yarn migration:generate:user
 yarn migration:generate:chat
 ```
 
+### Timestamps & Timezones
+
+Chat date columns (`created_at`, `updated_at`, `deleted_at` in `chat.conversations`,
+`chat.conversation_members`, `chat.messages`, `chat.deleted_messages`, and
+`chat.user_blocks`) use PostgreSQL `timestamp with time zone` (`timestamptz`).
+PostgreSQL stores them as UTC instants, so correctness no longer depends on the
+Node process timezone.
+
+> **Note:** `created_by`, `updated_by`, and `deleted_by` are actor IDs
+> (`character(24)`), not dates.
+
+The `AddTimestamptzToChatDates` migration performs a one-time backfill. Legacy
+rows mixed two sources: values written by the application had millisecond
+precision and were stored in the API's local timezone, while database-generated
+values (`CURRENT_TIMESTAMP`) had microsecond precision and were stored in UTC.
+The migration detects this by precision.
+
+If the machine running the migration is not in the API's historical timezone,
+set `LEGACY_LOCAL_TIMEZONE` (for example `LEGACY_LOCAL_TIMEZONE=Asia/Tehran`)
+before running `yarn migration:run`. Otherwise it falls back to the machine
+timezone, then to `UTC`.
+
 ---
 
 ## Testing
