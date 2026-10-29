@@ -188,6 +188,19 @@ describe('ConversationPostgresReadRepository', () => {
         { titleSearch: '%team%' },
       );
     });
+
+    it('should filter by conversation type', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+        type: ConversationType.GROUP,
+      });
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith('c.type = :type', {
+        type: ConversationType.GROUP,
+      });
+    });
   });
 
   describe('getUserGroupConversationList', () => {

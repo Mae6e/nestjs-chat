@@ -147,7 +147,9 @@ export class ConversationEntity extends AggregateRoot<string> {
       ConversationType.DIRECT,
       null,
       null,
+      null,
       uuidv7(),
+      userId,
     );
 
     conversation.addMember(

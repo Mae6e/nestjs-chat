@@ -1,23 +1,39 @@
-import { IsInt, IsNotEmpty, IsNumberString, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNumberString,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 
 export class GetUserConversationListRequest {
-  @IsNotEmpty()
+  @IsOptional()
   @IsNumberString({}, { message: 'userId should be a number string' })
-  targetUserId: string;
+  targetUserId?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString({ message: 'filter should be a string' })
-  filter: string;
+  filter?: string;
 
-  @IsNotEmpty()
+  /**
+   * Conversation type to list. Defaults to `DIRECT`.
+   * Send `GROUP` to list group chats instead.
+   */
+  @IsOptional()
+  @IsEnum(ConversationType, {
+    message: 'type should be either DIRECT or GROUP',
+  })
+  type?: ConversationType;
+
+  @IsOptional()
   @IsInt({ message: 'page should be an int' })
-  page: number;
+  page?: number;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsInt({ message: 'pageSize should be an int' })
-  pageSize: number;
+  pageSize?: number;
 }
 
 export class UserConversationListItemMessageUser {

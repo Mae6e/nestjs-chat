@@ -208,6 +208,38 @@ describe('ChatWsGateway', () => {
       );
       expect(result.data[0].id).toBe('conv-1');
       expect(result.data[0].identifier).toBe('janes');
+
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.type).toBe(ConversationType.DIRECT);
+    });
+
+    it('should list group conversations when type is GROUP', async () => {
+      queryBus.execute.mockResolvedValue({ meta: {}, data: [] });
+      userIntegrationPort.getUsersByIds.mockResolvedValue([]);
+
+      await gateway.getUserConversationList(
+        { page: 1, pageSize: 10, type: ConversationType.GROUP } as any,
+        'user-1',
+      );
+
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.type).toBe(ConversationType.GROUP);
+    });
+
+    it('should keep an explicit DIRECT type', async () => {
+      queryBus.execute.mockResolvedValue({ meta: {}, data: [] });
+      userIntegrationPort.getUsersByIds.mockResolvedValue([]);
+
+      await gateway.getUserConversationList(
+        { page: 1, pageSize: 10, type: ConversationType.DIRECT } as any,
+        'user-1',
+      );
+
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.type).toBe(ConversationType.DIRECT);
     });
 
     it('should filter by username', async () => {

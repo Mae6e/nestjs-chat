@@ -277,6 +277,9 @@ export class ChatWsGateway
     const conversationList = await this.queryBus.execute(
       new GetUserConversationListQuery(authUserId, {
         pagination,
+        // Direct chats are listed by default; send `type: 'GROUP'` to list
+        // group chats instead.
+        type: data.type ?? ConversationType.DIRECT,
         filterUserIds: filteredUserIds.filter(
           (userId) => userId && userId !== authUserId,
         ),
