@@ -13,6 +13,7 @@ import {
   GroupAdminRequiredException,
   GroupJoinRequestNotFoundException,
   GroupMemberLimitExceededException,
+  UserAlreadyInGroupException,
 } from '@modules/chat/domain/chat.exceptions';
 import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 
@@ -37,6 +38,8 @@ describe('RespondToJoinRequestHandler', () => {
     commandRepo = {
       getConversationById: jest.fn(),
       countMembers: jest.fn(async () => 0),
+      hasActiveGroupMembership: jest.fn(async () => false),
+      deletePendingMembershipsForUser: jest.fn(async () => 0),
       saveMember: jest.fn(async (member) => member),
     } as any;
 
@@ -82,9 +85,18 @@ describe('RespondToJoinRequestHandler', () => {
     expect(member.status).toBe(ConversationMemberStatus.ACTIVE);
     expect(member.isActive()).toBe(true);
     expect(member.updatedBy).toBe('admin');
+    expect(commandRepo.hasActiveGroupMembership).toHaveBeenCalledWith(
+      'user-2',
+      conversation.id,
+    );
+    expect(commandRepo.deletePendingMembershipsForUser).toHaveBeenCalledWith(
+      'user-2',
+      conversation.id,
+      'admin',
+    );
   });
 
-  it('rejects a pending join request', async () => {
+  it('rejects a pending join request without deleting other requests', async () => {
     const conversation = buildGroupWithPending();
     commandRepo.getConversationById.mockResolvedValue(conversation);
 
@@ -99,6 +111,27 @@ describe('RespondToJoinRequestHandler', () => {
 
     expect(member.status).toBe(ConversationMemberStatus.REJECTED);
     expect(member.updatedBy).toBe('admin');
+    expect(commandRepo.deletePendingMembershipsForUser).not.toHaveBeenCalled();
+  });
+
+  it('throws when the requester already belongs to another group', async () => {
+    const conversation = buildGroupWithPending();
+    commandRepo.getConversationById.mockResolvedValue(conversation);
+    commandRepo.hasActiveGroupMembership.mockResolvedValue(true);
+
+    await expect(
+      handler.execute(
+        new RespondToJoinRequestCommand(
+          conversation.id,
+          'admin',
+          'user-2',
+          GroupJoinRequestAction.APPROVE,
+        ),
+      ),
+    ).rejects.toThrow(UserAlreadyInGroupException);
+
+    expect(commandRepo.saveMember).not.toHaveBeenCalled();
+    expect(commandRepo.deletePendingMembershipsForUser).not.toHaveBeenCalled();
   });
 
   it('throws when there is no pending request', async () => {

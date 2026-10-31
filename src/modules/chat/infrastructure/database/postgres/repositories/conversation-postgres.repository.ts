@@ -12,6 +12,7 @@ import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
 import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
 import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
+import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 @Injectable()
 export class ConversationPostgresRepository implements ConversationRepositoryPort {
@@ -161,6 +162,78 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
   ): Promise<number> {
     return this.dataSource.getRepository(ConversationMember).count({
       where: { conversation_id: conversationId, status },
+    });
+  }
+
+  async hasActiveGroupMembership(
+    userId: string,
+    exceptConversationId?: string,
+  ): Promise<boolean> {
+    const query = this.dataSource
+      .getRepository(ConversationMember)
+      .createQueryBuilder('cm')
+      .innerJoin('cm.conversation', 'c')
+      .where('cm.user_id = :userId', { userId })
+      .andWhere('cm.status = :status', {
+        status: ConversationMemberStatus.ACTIVE,
+      })
+      .andWhere('c.type = :type', { type: ConversationType.GROUP });
+
+    if (exceptConversationId) {
+      query.andWhere('cm.conversation_id != :exceptConversationId', {
+        exceptConversationId,
+      });
+    }
+
+    return query.getExists();
+  }
+
+  async deletePendingMembershipsForUser(
+    userId: string,
+    exceptConversationId?: string,
+    deletedBy: string | null = null,
+  ): Promise<number> {
+    return this.dataSource.transaction(async (entityManager) => {
+      const memberRepository = entityManager.getRepository(ConversationMember);
+
+      const query = memberRepository
+        .createQueryBuilder('cm')
+        .select('cm.id', 'id')
+        .where('cm.user_id = :userId', { userId })
+        .andWhere('cm.status = :status', {
+          status: ConversationMemberStatus.PENDING,
+        });
+
+      if (exceptConversationId) {
+        query.andWhere('cm.conversation_id != :exceptConversationId', {
+          exceptConversationId,
+        });
+      }
+
+      const pending = await query.getRawMany<{ id: string }>();
+      if (pending.length === 0) {
+        return 0;
+      }
+
+      const ids = pending.map((row) => row.id);
+
+      const result = await memberRepository
+        .createQueryBuilder()
+        .softDelete()
+        .from(ConversationMember)
+        .whereInIds(ids)
+        .execute();
+
+      if (deletedBy !== null) {
+        await memberRepository
+          .createQueryBuilder()
+          .update(ConversationMember)
+          .set({ deleted_by: deletedBy })
+          .whereInIds(ids)
+          .execute();
+      }
+
+      return result.affected ?? 0;
     });
   }
 

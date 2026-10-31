@@ -11,6 +11,7 @@ import {
   GroupMemberAlreadyExistsException,
   GroupMemberLimitExceededException,
   NotAGroupConversationException,
+  UserAlreadyInGroupException,
 } from '@modules/chat/domain/chat.exceptions';
 import { MAX_GROUP_MEMBERS } from '@modules/chat/domain/constants/group.constants';
 
@@ -23,6 +24,7 @@ describe('RequestJoinGroupHandler', () => {
       getConversationById: jest.fn(),
       getMembership: jest.fn(),
       countMembers: jest.fn(async () => 0),
+      hasActiveGroupMembership: jest.fn(async () => false),
       saveMember: jest.fn(async (member) => member),
     } as any;
 
@@ -98,6 +100,20 @@ describe('RequestJoinGroupHandler', () => {
     await expect(
       handler.execute(new RequestJoinGroupCommand(conversation.id, 'user-2')),
     ).rejects.toThrow(GroupMemberAlreadyExistsException);
+  });
+
+  it('throws when the user already belongs to another group', async () => {
+    const conversation = ConversationEntity.createGroup('admin', 'Team');
+    commandRepo.getConversationById.mockResolvedValue(conversation);
+    commandRepo.getMembership.mockResolvedValue(null);
+    commandRepo.hasActiveGroupMembership.mockResolvedValue(true);
+
+    await expect(
+      handler.execute(new RequestJoinGroupCommand(conversation.id, 'user-2')),
+    ).rejects.toThrow(UserAlreadyInGroupException);
+
+    expect(commandRepo.hasActiveGroupMembership).toHaveBeenCalledWith('user-2');
+    expect(commandRepo.saveMember).not.toHaveBeenCalled();
   });
 
   it('throws when the group has reached the member limit', async () => {

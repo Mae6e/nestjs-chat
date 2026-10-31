@@ -18,7 +18,15 @@ describe('ConversationPostgresRepository', () => {
   beforeEach(async () => {
     queryBuilderMock = {
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      whereInIds: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
       getMany: jest.fn(),
+      getRawMany: jest.fn(),
+      getExists: jest.fn(),
       softDelete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       execute: jest.fn(),
@@ -129,6 +137,78 @@ describe('ConversationPostgresRepository', () => {
       queryBuilderMock.execute.mockResolvedValue({ affected: 1 });
       const result = await repository.deleteConversation('conv-1');
       expect(result).toBe(true);
+    });
+  });
+
+  describe('hasActiveGroupMembership', () => {
+    it('should return true when the user is active in a group', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(true);
+
+      const result = await repository.hasActiveGroupMembership('user-1');
+
+      expect(result).toBe(true);
+      expect(queryBuilderMock.innerJoin).toHaveBeenCalledWith(
+        'cm.conversation',
+        'c',
+      );
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith('c.type = :type', {
+        type: ConversationType.GROUP,
+      });
+    });
+
+    it('should exclude the given conversation', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(false);
+
+      const result = await repository.hasActiveGroupMembership(
+        'user-1',
+        'conv-1',
+      );
+
+      expect(result).toBe(false);
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm.conversation_id != :exceptConversationId',
+        { exceptConversationId: 'conv-1' },
+      );
+    });
+  });
+
+  describe('deletePendingMembershipsForUser', () => {
+    it('should soft-delete pending memberships and set deleted_by', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([
+        { id: 'cm-1' },
+        { id: 'cm-2' },
+      ]);
+      queryBuilderMock.execute.mockResolvedValue({ affected: 2 });
+
+      const result = await repository.deletePendingMembershipsForUser(
+        'user-1',
+        'conv-keep',
+        'admin',
+      );
+
+      expect(result).toBe(2);
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm.conversation_id != :exceptConversationId',
+        { exceptConversationId: 'conv-keep' },
+      );
+      expect(queryBuilderMock.whereInIds).toHaveBeenCalledWith([
+        'cm-1',
+        'cm-2',
+      ]);
+      expect(queryBuilderMock.set).toHaveBeenCalledWith({
+        deleted_by: 'admin',
+      });
+      expect(queryBuilderMock.softDelete).toHaveBeenCalled();
+    });
+
+    it('should return 0 without deleting when there is no pending request', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([]);
+
+      const result = await repository.deletePendingMembershipsForUser('user-1');
+
+      expect(result).toBe(0);
+      expect(queryBuilderMock.softDelete).not.toHaveBeenCalled();
+      expect(queryBuilderMock.set).not.toHaveBeenCalled();
     });
   });
 

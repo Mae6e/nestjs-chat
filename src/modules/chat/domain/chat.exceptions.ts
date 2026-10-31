@@ -106,6 +106,18 @@ export class GroupMemberRequestPendingException extends DomainException {
   }
 }
 
+export class UserAlreadyInGroupException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `User already belongs to a group: ${reason}`
+        : 'User already belongs to a group',
+      'CHAT_USER_ALREADY_IN_GROUP',
+      'CONFLICT',
+    );
+  }
+}
+
 export class GroupMemberNotFoundException extends DomainException {
   constructor(reason?: string) {
     super(

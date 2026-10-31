@@ -22,6 +22,25 @@ export abstract class ConversationRepositoryPort {
 
   abstract countMembers(conversationId: string): Promise<number>;
 
+  /**
+   * True when the user is an active member of any group conversation.
+   * A user may belong to only one group at a time.
+   */
+  abstract hasActiveGroupMembership(
+    userId: string,
+    exceptConversationId?: string,
+  ): Promise<boolean>;
+
+  /**
+   * Soft-deletes every pending join request of the user, optionally keeping
+   * the request for one conversation (the one just approved).
+   */
+  abstract deletePendingMembershipsForUser(
+    userId: string,
+    exceptConversationId?: string,
+    deletedBy?: string | null,
+  ): Promise<number>;
+
   abstract saveMember(
     member: ConversationMemberEntity,
   ): Promise<ConversationMemberEntity>;

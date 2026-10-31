@@ -14,6 +14,7 @@ import {
   GroupJoinRequestNotFoundException,
   GroupMemberLimitExceededException,
   NotAGroupConversationException,
+  UserAlreadyInGroupException,
 } from '@modules/chat/domain/chat.exceptions';
 
 @CommandHandler(RespondToJoinRequestCommand)
@@ -51,6 +52,15 @@ export class RespondToJoinRequestHandler implements ICommandHandler<
     }
 
     if (action === GroupJoinRequestAction.APPROVE) {
+      // A user may belong to only one group at a time.
+      const alreadyInGroup = await this.commandRepo.hasActiveGroupMembership(
+        targetUserId,
+        conversationId,
+      );
+      if (alreadyInGroup) {
+        throw new UserAlreadyInGroupException(targetUserId);
+      }
+
       const membersCount = await this.commandRepo.countMembers(conversationId);
       if (membersCount >= MAX_GROUP_MEMBERS) {
         throw new GroupMemberLimitExceededException(
@@ -63,6 +73,16 @@ export class RespondToJoinRequestHandler implements ICommandHandler<
     }
 
     const saved = await this.commandRepo.saveMember(target);
+
+    // Approving a request makes this the user's only group, so drop every
+    // other pending request they may have in other groups.
+    if (action === GroupJoinRequestAction.APPROVE) {
+      await this.commandRepo.deletePendingMembershipsForUser(
+        targetUserId,
+        conversationId,
+        actorId,
+      );
+    }
 
     this.logger.log(
       `Admin ${actorId} ${action.toLowerCase()}d join request of ${targetUserId} for group ${conversationId}`,

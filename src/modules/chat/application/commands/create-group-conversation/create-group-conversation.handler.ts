@@ -3,7 +3,10 @@ import { CreateGroupConversationCommand } from './create-group-conversation.comm
 import { Logger } from '@nestjs/common';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
-import { ChatDomainError } from '@modules/chat/domain/chat.exceptions';
+import {
+  ChatDomainError,
+  UserAlreadyInGroupException,
+} from '@modules/chat/domain/chat.exceptions';
 
 @CommandHandler(CreateGroupConversationCommand)
 export class CreateGroupConversationHandler implements ICommandHandler<
@@ -32,6 +35,13 @@ export class CreateGroupConversationHandler implements ICommandHandler<
       );
     }
 
+    // A user may belong to only one group at a time.
+    const alreadyInGroup =
+      await this.commandRepo.hasActiveGroupMembership(creatorId);
+    if (alreadyInGroup) {
+      throw new UserAlreadyInGroupException(creatorId);
+    }
+
     this.logger.debug(
       `Creating group "${trimmedTitle}" for creator ${creatorId}`,
     );
@@ -48,6 +58,14 @@ export class CreateGroupConversationHandler implements ICommandHandler<
 
     const savedConversation =
       await this.commandRepo.saveConversation(conversation);
+
+    // Creating a group makes this the creator's only group, so drop any
+    // pending join request they may have in other groups.
+    await this.commandRepo.deletePendingMembershipsForUser(
+      creatorId,
+      savedConversation.id,
+      creatorId,
+    );
 
     const conversationRoot =
       this.publisher.mergeObjectContext(savedConversation);

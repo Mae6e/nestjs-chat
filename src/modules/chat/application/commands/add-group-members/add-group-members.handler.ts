@@ -15,6 +15,7 @@ import {
   GroupMemberLimitExceededException,
   NotAGroupConversationException,
   TargetUserNotFoundException,
+  UserAlreadyInGroupException,
 } from '@modules/chat/domain/chat.exceptions';
 
 @CommandHandler(AddGroupMembersCommand)
@@ -69,6 +70,24 @@ export class AddGroupMembersHandler implements ICommandHandler<
     const usersToAdd = userIds.filter(
       (userId) => !conversation.getMember(userId)?.isActive(),
     );
+
+    // A user may belong to only one group at a time.
+    const groupMemberships = await Promise.all(
+      usersToAdd.map(async (userId) => ({
+        userId,
+        inGroup: await this.commandRepo.hasActiveGroupMembership(
+          userId,
+          conversationId,
+        ),
+      })),
+    );
+    const alreadyInGroup = groupMemberships
+      .filter((membership) => membership.inGroup)
+      .map((membership) => membership.userId);
+    if (alreadyInGroup.length > 0) {
+      throw new UserAlreadyInGroupException(alreadyInGroup.join(', '));
+    }
+
     const membersCount = await this.commandRepo.countMembers(conversationId);
     if (membersCount + usersToAdd.length > MAX_GROUP_MEMBERS) {
       throw new GroupMemberLimitExceededException(
@@ -99,6 +118,14 @@ export class AddGroupMembersHandler implements ICommandHandler<
       }
 
       added.push(await this.commandRepo.saveMember(member));
+
+      // Adding a member directly makes this their only group, so drop any
+      // pending join request they may have in other groups.
+      await this.commandRepo.deletePendingMembershipsForUser(
+        userId,
+        conversationId,
+        actorId,
+      );
     }
 
     this.logger.log(

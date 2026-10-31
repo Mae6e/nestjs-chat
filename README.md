@@ -394,6 +394,8 @@ Clients emit the following events to interact with the chat service:
 | `conversation.group.member.remove` | `{ conversationId: string, userId: string }`                                   | **(admin)** Removes another member from the group. Admins cannot remove themselves (use `conversation.group.leave`) and the `OWNER` cannot be removed.                                                                                                                                    |
 | `conversation.group.member.role`   | `{ conversationId: string, userId: string, role: "USER" \| "ADMIN" }`          | **(admin)** Promotes/demotes a member. The last admin cannot be demoted.                                                                                                        |
 
+> **One group per user:** a user can be an active member of only one group at a time. Creating a group, being added directly, or having a join request approved fails with `CHAT_USER_ALREADY_IN_GROUP` when the user already belongs to another group. Approving a request or adding a member directly also soft-deletes that user's other pending join requests.
+
 ### Server-to-Client Events
 
 Clients receive the following broadcast and direct events:

@@ -13,6 +13,7 @@ import {
   GroupMemberLimitExceededException,
   GroupMemberRequestPendingException,
   NotAGroupConversationException,
+  UserAlreadyInGroupException,
 } from '@modules/chat/domain/chat.exceptions';
 
 @CommandHandler(RequestJoinGroupCommand)
@@ -46,6 +47,13 @@ export class RequestJoinGroupHandler implements ICommandHandler<
 
     if (existing?.isPending()) {
       throw new GroupMemberRequestPendingException(userId);
+    }
+
+    // A user may belong to only one group at a time.
+    const alreadyInGroup =
+      await this.commandRepo.hasActiveGroupMembership(userId);
+    if (alreadyInGroup) {
+      throw new UserAlreadyInGroupException(userId);
     }
 
     const membersCount = await this.commandRepo.countMembers(conversationId);
