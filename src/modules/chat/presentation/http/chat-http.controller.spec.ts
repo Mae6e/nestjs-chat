@@ -173,6 +173,7 @@ describe('ChatHttpController', () => {
           {
             id: 'group-1',
             type: ConversationType.GROUP,
+            description: 'Should not be exposed by this endpoint',
             picture: 'picture.png',
             notSeenCount: 3,
             status: ConversationMemberStatus.PENDING,
@@ -200,6 +201,7 @@ describe('ChatHttpController', () => {
       expect(response.data[0]).not.toHaveProperty('updatedBy');
       expect(response.data[0]).not.toHaveProperty('notSeenCount');
       expect(response.data[0]).not.toHaveProperty('type');
+      expect(response.data[0]).not.toHaveProperty('description');
     });
   });
 
@@ -211,6 +213,7 @@ describe('ChatHttpController', () => {
             id: 'group-1',
             type: ConversationType.GROUP,
             title: 'Team',
+            description: 'Team description',
             picture: 'picture.png',
             createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-02T00:00:00.000Z',
@@ -252,6 +255,7 @@ describe('ChatHttpController', () => {
       expect(response.data[0].notSeenCount).toBe(4);
       expect(response.data[0].status).toBe(ConversationMemberStatus.ACTIVE);
       expect(response.data[0].role).toBe(ConversationMemberRole.ADMIN);
+      expect(response.data[0].description).toBe('Team description');
       expect(response.data[0]).not.toHaveProperty('type');
       expect(response.data[0].picture).toBe(
         '/uploads/group-pictures/picture.png',

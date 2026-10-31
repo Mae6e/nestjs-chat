@@ -77,6 +77,13 @@ export class GroupConversationListItemDto {
 }
 
 export class MyGroupConversationListItemDto extends GroupConversationListItemDto {
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Group description.',
+  })
+  description: string | null;
+
   @ApiProperty({ enum: ConversationMemberRole })
   role: ConversationMemberRole;
 

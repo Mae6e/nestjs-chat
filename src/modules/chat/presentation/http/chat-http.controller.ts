@@ -481,6 +481,7 @@ export class ChatHttpController {
       data: result.data.map((item) => ({
         id: item.id,
         title: item.title,
+        description: item.description,
         picture: this.fileStorage.getGroupPictureUrl(item.picture),
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,

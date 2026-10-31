@@ -215,6 +215,7 @@ describe('ConversationPostgresReadRepository', () => {
             type: ConversationType.GROUP,
             identifier: 'should-not-be-returned',
             title: 'My group',
+            description: 'My group description',
             picture: null,
             created_by: 'user-1',
             created_at: createdAt,
@@ -225,6 +226,7 @@ describe('ConversationPostgresReadRepository', () => {
             type: ConversationType.GROUP,
             identifier: 'should-not-be-returned',
             title: 'Another group',
+            description: null,
             picture: null,
             created_by: 'user-2',
             created_at: createdAt,
@@ -266,6 +268,7 @@ describe('ConversationPostgresReadRepository', () => {
         {
           id: 'group-mine',
           title: 'My group',
+          description: 'My group description',
           picture: null,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-02T00:00:00.000Z',
@@ -277,6 +280,7 @@ describe('ConversationPostgresReadRepository', () => {
         {
           id: 'group-other',
           title: 'Another group',
+          description: null,
           picture: null,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-02T00:00:00.000Z',
@@ -349,6 +353,7 @@ describe('ConversationPostgresReadRepository', () => {
             id: 'group-1',
             type: ConversationType.GROUP,
             title: 'Team',
+            description: 'The team group',
             picture: null,
             created_by: 'user-2',
             created_at: createdAt,
@@ -387,6 +392,7 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data[0]).toEqual({
         id: 'group-1',
         title: 'Team',
+        description: 'The team group',
         picture: null,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T00:00:00.000Z',

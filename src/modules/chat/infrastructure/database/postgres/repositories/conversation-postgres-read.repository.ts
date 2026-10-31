@@ -272,6 +272,7 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
         return {
           id: conv.id,
           title: conv.title,
+          description: conv.description,
           picture: conv.picture,
           createdAt: conv.created_at.toISOString(),
           updatedAt: conv.updated_at.toISOString(),

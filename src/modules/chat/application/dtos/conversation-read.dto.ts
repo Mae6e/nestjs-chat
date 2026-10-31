@@ -30,6 +30,7 @@ export interface ConversationReadDto {
 export interface GroupConversationListItemReadDto {
   id: string;
   title: string | null;
+  description: string | null;
   picture: string | null;
   createdAt: string;
   updatedAt: string;
