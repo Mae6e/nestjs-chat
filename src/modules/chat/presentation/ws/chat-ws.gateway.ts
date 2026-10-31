@@ -15,6 +15,7 @@ import { GetUserConversationQuery } from '@modules/chat/application/queries/get-
 import { GetUserConversationMessageListQuery } from '@modules/chat/application/queries/get-user-conversation-message-list/get-user-conversation-message-list.query';
 import { GetGroupMembersQuery } from '@modules/chat/application/queries/get-group-members/get-group-members.query';
 import { GetGroupJoinRequestsQuery } from '@modules/chat/application/queries/get-group-join-requests/get-group-join-requests.query';
+import { GetUserConversationIdsQuery } from '@modules/chat/application/queries/get-user-conversation-ids/get-user-conversation-ids.query';
 import {
   ConnectedSocket,
   MessageBody,
@@ -39,6 +40,7 @@ import { UserIntegrationPort } from '@modules/chat/application/ports/user-integr
 import { CurrentUserId } from '@common/decorators/current-user-id.decorator';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 import { CreateConversationRequest } from '@modules/chat/presentation/ws/dtos/create-conversation.dto';
 import { MessageType } from '@modules/chat/domain/enums/chat-type.enum';
 import { BaseWsGateway } from '@common/websocket/base-ws.gateway';
@@ -110,11 +112,34 @@ export class ChatWsGateway
     try {
       const authPayload = await client.data['authPromise'];
 
-      const userEventsRoom = `user-${authPayload.sub}`;
+      const rooms = [`user-${authPayload.sub}`];
+
+      // Join the rooms of the user's active groups so group-scoped events can
+      // be delivered with a single conversation-room broadcast.
+      try {
+        const groupConversationIds = await this.queryBus.execute(
+          new GetUserConversationIdsQuery(authPayload.sub, {
+            type: ConversationType.GROUP,
+            status: ConversationMemberStatus.ACTIVE,
+          }),
+        );
+
+        rooms.push(
+          ...(groupConversationIds ?? []).map(
+            (conversationId: string) => `conversation-${conversationId}`,
+          ),
+        );
+      } catch (e) {
+        // A room-sync failure must not prevent the client from connecting.
+        this.logger.error(
+          `Failed to load group rooms for user ${authPayload.sub}: ${(e as Error).message}`,
+        );
+      }
+
       this.logger.debug(
-        `Joining user ${authPayload.sub} to room ${userEventsRoom}`,
+        `Joining user ${authPayload.sub} to rooms ${rooms.join(', ')}`,
       );
-      client.join(userEventsRoom);
+      client.join(rooms);
 
       this.logger.log(`Client authorized: ${authPayload.sub}`);
       client.emit('ready');
@@ -134,6 +159,45 @@ export class ChatWsGateway
     } else {
       this.logger.debug(`Unknown client ${client.id} disconnected`);
     }
+  }
+
+  private conversationRoom(conversationId: string): string {
+    return `conversation-${conversationId}`;
+  }
+
+  /**
+   * Adds every socket of the user (all devices/tabs) to the conversation room.
+   *
+   * Also used by the HTTP group-creation endpoint, which creates the
+   * conversation after the creator's sockets have already connected.
+   */
+  async joinConversationRoom(
+    userId: string,
+    conversationId: string,
+  ): Promise<void> {
+    if (!this.server) {
+      return;
+    }
+
+    await this.server
+      .in(`user-${userId}`)
+      .socketsJoin(this.conversationRoom(conversationId));
+  }
+
+  /**
+   * Removes every socket of the user from the conversation room.
+   */
+  async leaveConversationRoom(
+    userId: string,
+    conversationId: string,
+  ): Promise<void> {
+    if (!this.server) {
+      return;
+    }
+
+    await this.server
+      .in(`user-${userId}`)
+      .socketsLeave(this.conversationRoom(conversationId));
   }
 
   @SubscribeMessage('conversation.create')
@@ -584,10 +648,12 @@ export class ChatWsGateway
       ),
     );
 
-    // Broadcast the event to all members including sender's other devices
-    const recipientRooms = conversation.members.map(
-      (member) => `user-${member.userId}`,
-    );
+    // Group read receipts fan out through the conversation room; direct
+    // conversations keep using per-user rooms.
+    const recipientRooms =
+      conversation.type === ConversationType.GROUP
+        ? [this.conversationRoom(conversation.id)]
+        : conversation.members.map((member) => `user-${member.userId}`);
 
     await this.broadcast(
       client,
@@ -735,25 +801,18 @@ export class ChatWsGateway
     const isApprove = action === GroupJoinRequestAction.APPROVE;
 
     if (isApprove) {
-      //todo: broadcast to room
-      // const conversations =
-      //   await this.conversationRepository.getConversationById(
-      //     data.conversationId,
-      //   );
-      // const rooms = [
-      //   `user-${data.userId}`,
-      //   ...(conversations?.getActiveMembers() ?? []).map(
-      //     (m) => `user-${m.userId}`,
-      //   ),
-      // ];
-      // await this.broadcast(
-      //   client,
-      //   Array.from(new Set(rooms)),
-      //   new GroupJoinApprovedEvent({
-      //     conversationId: data.conversationId,
-      //     userId: data.userId,
-      //   }),
-      // );
+      // The approved user was not a member before, so add all of their
+      // sockets to the conversation room before broadcasting.
+      await this.joinConversationRoom(data.userId, data.conversationId);
+
+      await this.broadcast(
+        client,
+        [this.conversationRoom(data.conversationId)],
+        new GroupJoinApprovedEvent({
+          conversationId: data.conversationId,
+          userId: data.userId,
+        }),
+      );
     } else {
       await this.broadcast(
         client,
@@ -787,16 +846,22 @@ export class ChatWsGateway
       ),
     );
 
-    const conversation = await this.conversationRepository.getConversationById(
-      data.conversationId,
-    );
-    const rooms = (conversation?.getActiveMembers() ?? []).map(
-      (member) => `user-${member.userId}`,
+    // Added users may be online; join all of their sockets to the room so they
+    // receive this event and future group events.
+    await Promise.all(
+      added.map((member) =>
+        this.joinConversationRoom(member.userId, data.conversationId),
+      ),
     );
 
     await this.broadcast(
       client,
-      rooms,
+      [
+        this.conversationRoom(data.conversationId),
+        // Same `socketsJoin` race as in the approve flow: also send to the
+        // added users' personal rooms.
+        ...added.map((member) => `user-${member.userId}`),
+      ],
       new GroupMemberAddedEvent({
         conversationId: data.conversationId,
         userIds: added.map((member) => member.userId),
@@ -828,23 +893,19 @@ export class ChatWsGateway
       ),
     );
 
-    //todo: broadcast to room
-
-    const rooms = [
-      `user-${data.userId}`,
-      ...(conversationBefore?.getActiveMembers() ?? [])
-        .filter((member) => member.userId !== data.userId)
-        .map((member) => `user-${member.userId}`),
-    ];
-
+    // Let the removed user know first (their personal room guarantees delivery
+    // even if they were already dropped from the conversation room), then take
+    // their sockets out of the room so later messages do not reach them.
     await this.broadcast(
       client,
-      Array.from(new Set(rooms)),
+      [this.conversationRoom(conversationBefore.id)],
       new GroupMemberRemovedEvent({
         conversationId: data.conversationId,
         userId: data.userId,
       }),
     );
+
+    await this.leaveConversationRoom(data.userId, data.conversationId);
 
     return { conversationId: data.conversationId, userId: data.userId };
   }
@@ -905,9 +966,7 @@ export class ChatWsGateway
 
     // The leaving member was the last one, so the group no longer exists.
     if (!result.conversationDeleted) {
-      const rooms = (conversationBefore?.getActiveMembers() ?? []).map(
-        (member) => `user-${member.userId}`,
-      );
+      const rooms = [this.conversationRoom(conversationBefore.id)];
 
       // The last admin left: tell the group who the new admin is.
       if (result.promotedAdminId) {
@@ -931,6 +990,10 @@ export class ChatWsGateway
         }),
       );
     }
+
+    // The event has been delivered; now drop the leaving user's sockets from
+    // the conversation room.
+    await this.leaveConversationRoom(authUserId, data.conversationId);
 
     return {
       conversationId: data.conversationId,

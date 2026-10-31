@@ -408,9 +408,23 @@ describe('ConversationPostgresReadRepository', () => {
 
   describe('getUserConversationIds', () => {
     it('should return array of ids', async () => {
-      queryBuilderMock.getMany.mockResolvedValue([{ id: 'conv-1' }]);
+      queryBuilderMock.getRawMany.mockResolvedValue([{ id: 'conv-1' }]);
       const result = await repository.getUserConversationIds('user-1', {});
       expect(result).toEqual(['conv-1']);
+    });
+
+    it('should filter by membership status when requested', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([{ id: 'conv-1' }]);
+
+      const result = await repository.getUserConversationIds('user-1', {
+        status: ConversationMemberStatus.ACTIVE,
+      });
+
+      expect(result).toEqual(['conv-1']);
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm.status = :status',
+        { status: ConversationMemberStatus.ACTIVE },
+      );
     });
   });
 

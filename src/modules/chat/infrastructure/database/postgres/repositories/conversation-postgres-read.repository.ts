@@ -297,15 +297,19 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
       .select('c.id', 'id')
       .innerJoin('c.conversationMembers', 'cm', 'cm.user_id = :userId', {
         userId,
-      });
+      })
+      .andWhere('cm.deleted_at IS NULL');
 
     if (options.type != null) {
       query.andWhere('c.type = :type', { type: options.type });
     }
 
-    const res = await query.getMany().then((rows) => rows.map((c) => c.id));
+    if (options.status != null) {
+      query.andWhere('cm.status = :status', { status: options.status });
+    }
 
-    return res;
+    const rows = await query.getRawMany<{ id: string }>();
+    return rows.map((r) => r.id);
   }
 
   async getUserConversationById(

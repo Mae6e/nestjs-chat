@@ -28,6 +28,30 @@ describe('GlobalWsExceptionFilter', () => {
       );
     });
 
+    it('should call the ack callback when Nest appends the event pattern after it', () => {
+      const exception = new WsException('custom error');
+      const client = { emit: jest.fn() };
+      const callback = jest.fn();
+      const host = {
+        switchToWs: () => ({
+          getClient: () => client,
+          getPattern: () => 'conversation.message.send',
+        }),
+        getArgs: () => [client, { text: 'hi' }, callback, 'pattern'],
+      } as any;
+
+      filter.catch(exception, host);
+
+      expect(callback).toHaveBeenCalledWith({
+        statusCode: 400,
+        message: 'custom error',
+      });
+      expect(client.emit).not.toHaveBeenCalledWith(
+        'error.server',
+        expect.anything(),
+      );
+    });
+
     it('should emit to client if no callback', () => {
       const exception = new Error('generic error');
       const client = { emit: jest.fn() };

@@ -8,6 +8,7 @@ import {
   UserMessageCreatedEvent,
 } from '@modules/chat/presentation/ws/events/message-created.event';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
+import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 @EventsHandler(MessageCreatedDomainEvent)
 export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreatedDomainEvent> {
@@ -54,18 +55,39 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
 
     // Direct conversations shadow blocked messages for the blocked user. Group
     // conversations deliver to every active member.
-    const rooms = conversation
+    const recipients = conversation
       .getActiveMembers()
       .filter(
         (member) =>
           member.userId !== senderUserId &&
           !event.deletedForUserIds.includes(member.userId),
-      )
-      .map((member) => `user-${member.userId}`);
+      );
 
-    if (rooms.length === 0) {
+    if (recipients.length === 0) {
       return;
     }
+
+    const isGroup = conversation.type === ConversationType.GROUP;
+
+    // Direct conversations use per-user rooms. Groups additionally fan out
+    // through a single conversation room, but keep the recipients' personal
+    // rooms as a fallback: a group creator is not in the conversation room
+    // until their socket reconnects, and room membership can lag behind the
+    // database after a join. Socket.IO de-duplicates sockets across rooms, so
+    // each client still receives the message exactly once.
+    const rooms = recipients.map((member) => `user-${member.userId}`);
+    if (isGroup) {
+      rooms.push(`conversation-${conversation.id}`);
+    }
+
+    // The sender already received the message through the send acknowledgement,
+    // so keep excluding all of their devices from this broadcast.
+    const exceptRooms = isGroup
+      ? [
+          `user-${senderUserId}`,
+          ...event.deletedForUserIds.map((userId) => `user-${userId}`),
+        ]
+      : [];
 
     try {
       const users = await this.userIntegrationPort.getUsersByIds([
@@ -96,6 +118,7 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
             id: conversation.id,
           },
         }),
+        exceptRooms,
       );
     } catch {
       this.logger.error(`Could not fetch users for message broadcast`);

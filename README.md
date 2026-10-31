@@ -118,6 +118,8 @@ Commands (write operations) and Queries (read operations) are separated via `@ne
 
 WebSocket connections are authenticated into per-user rooms (`user-<userId>`). Outgoing messages, new conversation creations, and read receipts are broadcast to both the recipient and the sender's user room, enabling real-time synchronization across multiple devices and open browser tabs.
 
+Group chats additionally use conversation rooms (`conversation-<id>`). A user's sockets join the rooms of all their active groups on connection, and are added/removed when they are approved, added, removed, or leave. Group messages and read receipts are broadcast to the conversation room, while membership changes are also sent to the affected user's personal room so they arrive even if the room join/leave has not been applied yet by the Redis adapter.
+
 ---
 
 ## Tech Stack

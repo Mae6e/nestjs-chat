@@ -18,6 +18,7 @@ describe('ChatWsGateway', () => {
   let commandBus: jest.Mocked<CommandBus>;
   let queryBus: jest.Mocked<QueryBus>;
   let userIntegrationPort: jest.Mocked<UserIntegrationPort>;
+  let conversationRepository: jest.Mocked<ConversationRepositoryPort>;
 
   beforeEach(async () => {
     chatWsGuard = {
@@ -34,7 +35,7 @@ describe('ChatWsGateway', () => {
       getUsersByIds: jest.fn(),
       getBlockedUsersIds: jest.fn(),
     } as unknown as jest.Mocked<UserIntegrationPort>;
-    const conversationRepository = {
+    conversationRepository = {
       getConversationById: jest.fn(),
     } as unknown as jest.Mocked<ConversationRepositoryPort>;
     const fileStorage = {
@@ -381,6 +382,115 @@ describe('ChatWsGateway', () => {
       );
       expect(result.messages.list[0].id).toBe('msg-1');
       expect(result.members).toHaveLength(1); // excluding authUserId
+    });
+  });
+
+  describe('group room membership', () => {
+    const client = {} as any;
+
+    beforeEach(() => {
+      gateway.joinConversationRoom = jest
+        .fn()
+        .mockResolvedValue(undefined) as any;
+      gateway.leaveConversationRoom = jest
+        .fn()
+        .mockResolvedValue(undefined) as any;
+    });
+
+    it('should join the approved user to the group and notify their personal room', async () => {
+      commandBus.execute.mockResolvedValue({ status: 'ACTIVE' });
+
+      await gateway.approveGroupJoinRequest(
+        client,
+        { conversationId: 'conv-1', userId: 'user-2' } as any,
+        'admin-1',
+      );
+
+      expect(gateway.joinConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2'],
+        expect.anything(),
+      );
+    });
+
+    it('should notify and remove a member from the group room', async () => {
+      conversationRepository.getConversationById.mockResolvedValue({
+        id: 'conv-1',
+      } as any);
+      commandBus.execute.mockResolvedValue({});
+
+      await gateway.removeGroupMember(
+        client,
+        { conversationId: 'conv-1', userId: 'user-2' } as any,
+        'admin-1',
+      );
+
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2'],
+        expect.anything(),
+      );
+      expect(gateway.leaveConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+    });
+
+    it('should notify the leaving user and drop them from the group room', async () => {
+      conversationRepository.getConversationById.mockResolvedValue({
+        id: 'conv-1',
+      } as any);
+      commandBus.execute.mockResolvedValue({
+        promotedAdminId: null,
+        conversationDeleted: false,
+      });
+
+      await gateway.leaveGroup(
+        client,
+        { conversationId: 'conv-1' } as any,
+        'user-2',
+      );
+
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2'],
+        expect.anything(),
+      );
+      expect(gateway.leaveConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+    });
+
+    it('should join added members to the group room', async () => {
+      commandBus.execute.mockResolvedValue([
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+      ]);
+
+      await gateway.addGroupMembers(
+        client,
+        { conversationId: 'conv-1', userIds: ['user-2', 'user-3'] } as any,
+        'admin-1',
+      );
+
+      expect(gateway.joinConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+      expect(gateway.joinConversationRoom).toHaveBeenCalledWith(
+        'user-3',
+        'conv-1',
+      );
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2', 'user-user-3'],
+        expect.anything(),
+      );
     });
   });
 

@@ -39,7 +39,13 @@ export class GlobalWsExceptionFilter extends BaseWsExceptionFilter {
 
     if (typeof client.emit === 'function' && pattern) {
       const args = host.getArgs();
-      const callback = args[args.length - 1];
+      // The socket.io ack callback is not always the last argument: Nest adds
+      // the event pattern after it. Find the callback so clients that emit
+      // with an ack get the error instead of waiting forever.
+      const callback = [...args]
+        .reverse()
+        .find((arg) => typeof arg === 'function');
+
       if (typeof callback === 'function') {
         callback(response);
       } else {

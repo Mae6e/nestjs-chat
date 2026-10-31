@@ -66,6 +66,7 @@ describe('ChatHttpController', () => {
     chatWsGateway = {
       server: {},
       serverBroadcast: jest.fn().mockResolvedValue(true),
+      joinConversationRoom: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<ChatWsGateway>;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -325,12 +326,16 @@ describe('ChatHttpController', () => {
       expect(commandBus.execute).toHaveBeenCalledWith(
         new CreateGroupConversationCommand('auth-user', 'Team', 'picture.png'),
       );
+      expect(chatWsGateway.joinConversationRoom).toHaveBeenCalledWith(
+        'auth-user',
+        conversation.id,
+      );
       expect(result).toMatchObject({
         id: conversation.id,
         type: ConversationType.GROUP,
         title: 'Team',
         picture: '/uploads/group-pictures/picture.png',
-        role: ConversationMemberRole.ADMIN,
+        role: ConversationMemberRole.OWNER,
       });
       expect(result).not.toHaveProperty('updatedBy');
       expect(result).not.toHaveProperty('members');

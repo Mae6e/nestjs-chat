@@ -194,6 +194,21 @@ export class ChatHttpController {
         ),
       );
 
+      // The creator's sockets connected before this group existed, so join
+      // them to the conversation room now. Otherwise group-scoped broadcasts
+      // (messages sent by other members) would not reach the creator until
+      // they reconnect.
+      try {
+        await this.chatWsGateway.joinConversationRoom(
+          authUserId,
+          conversation.id,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to join creator ${authUserId} to room of group ${conversation.id}: ${(error as Error).message}`,
+        );
+      }
+
       if (body.content?.trim()) {
         await this.commandBus.execute(
           new CreateMessageCommand(
