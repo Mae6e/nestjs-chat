@@ -8,6 +8,9 @@ import { AuthIntegrationPort } from '@modules/chat/application/ports/auth-integr
 import { WsException } from '@nestjs/websockets';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { DeleteConversationCommand } from '@modules/chat/application/commands/delete-conversation/delete-conversation.command';
+import { GetUserConversationListQuery } from '@modules/chat/application/queries/get-user-conversation-list/get-user-conversation-list.query';
+import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
+import { FileStoragePort } from '@modules/chat/application/ports/file-storage.port';
 
 describe('ChatWsGateway', () => {
   let gateway: ChatWsGateway;
@@ -15,6 +18,7 @@ describe('ChatWsGateway', () => {
   let commandBus: jest.Mocked<CommandBus>;
   let queryBus: jest.Mocked<QueryBus>;
   let userIntegrationPort: jest.Mocked<UserIntegrationPort>;
+  let conversationRepository: jest.Mocked<ConversationRepositoryPort>;
 
   beforeEach(async () => {
     chatWsGuard = {
@@ -31,6 +35,21 @@ describe('ChatWsGateway', () => {
       getUsersByIds: jest.fn(),
       getBlockedUsersIds: jest.fn(),
     } as unknown as jest.Mocked<UserIntegrationPort>;
+    conversationRepository = {
+      getConversationById: jest.fn(),
+    } as unknown as jest.Mocked<ConversationRepositoryPort>;
+    const fileStorage = {
+      saveGroupPicture: jest.fn(),
+      deleteGroupPicture: jest.fn(),
+      getGroupPictureUrl: jest.fn((picture: string | null) =>
+        picture
+          ? picture.startsWith('/')
+            ? picture
+            : `/uploads/group-pictures/${picture}`
+          : null,
+      ),
+      normalizeGroupPictureKey: jest.fn((picture: string) => picture),
+    } as unknown as jest.Mocked<FileStoragePort>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +58,11 @@ describe('ChatWsGateway', () => {
         { provide: CommandBus, useValue: commandBus },
         { provide: QueryBus, useValue: queryBus },
         { provide: UserIntegrationPort, useValue: userIntegrationPort },
+        {
+          provide: ConversationRepositoryPort,
+          useValue: conversationRepository,
+        },
+        { provide: FileStoragePort, useValue: fileStorage },
         { provide: AuthIntegrationPort, useValue: {} },
       ],
     })
@@ -62,12 +86,10 @@ describe('ChatWsGateway', () => {
 
   describe('createDirectConversation', () => {
     it('should throw if target user is blocked', async () => {
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-1',
-      } as any);
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-2',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: true,
         isBlocked: false,
@@ -83,18 +105,20 @@ describe('ChatWsGateway', () => {
     });
 
     it('should create conversation, broadcast, and return result', async () => {
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-1',
-        firstName: 'John',
-        lastName: 'Doe',
-        username: 'johndoe',
-      } as any);
-      userIntegrationPort.getUserById.mockResolvedValueOnce({
-        id: 'user-2',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        username: 'janesmith',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        {
+          id: 'user-1',
+          firstName: 'John',
+          lastName: 'Doe',
+          username: 'johndoe',
+        },
+        {
+          id: 'user-2',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          username: 'janesmith',
+        },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
         isBlocked: false,
@@ -121,9 +145,10 @@ describe('ChatWsGateway', () => {
     });
 
     it('should rollback conversation if message creation fails', async () => {
-      userIntegrationPort.getUserById.mockResolvedValue({
-        id: 'user-1',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
         isBlocked: false,
@@ -183,8 +208,39 @@ describe('ChatWsGateway', () => {
         'user-1',
       );
       expect(result.data[0].id).toBe('conv-1');
-      expect(result.data[0].title).toBe('Jane Smith');
       expect(result.data[0].identifier).toBe('janes');
+
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.type).toBe(ConversationType.DIRECT);
+    });
+
+    it('should list group conversations when type is GROUP', async () => {
+      queryBus.execute.mockResolvedValue({ meta: {}, data: [] });
+      userIntegrationPort.getUsersByIds.mockResolvedValue([]);
+
+      await gateway.getUserConversationList(
+        { page: 1, pageSize: 10, type: ConversationType.GROUP } as any,
+        'user-1',
+      );
+
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.type).toBe(ConversationType.GROUP);
+    });
+
+    it('should keep an explicit DIRECT type', async () => {
+      queryBus.execute.mockResolvedValue({ meta: {}, data: [] });
+      userIntegrationPort.getUsersByIds.mockResolvedValue([]);
+
+      await gateway.getUserConversationList(
+        { page: 1, pageSize: 10, type: ConversationType.DIRECT } as any,
+        'user-1',
+      );
+
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.type).toBe(ConversationType.DIRECT);
     });
 
     it('should filter by username', async () => {
@@ -201,9 +257,12 @@ describe('ChatWsGateway', () => {
       expect(
         userIntegrationPort.getUserIdsByNameOrUsername,
       ).toHaveBeenCalledWith('jan');
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.titleSearch).toBe('jan');
     });
 
-    it('should return empty if filter resolves to 0 users', async () => {
+    it('should still search titles when the filter resolves to 0 users', async () => {
       userIntegrationPort.getUserIdsByNameOrUsername.mockResolvedValue([]);
       queryBus.execute.mockResolvedValue({ meta: {}, data: [] });
       const result = await gateway.getUserConversationList(
@@ -211,6 +270,9 @@ describe('ChatWsGateway', () => {
         'user-1',
       );
       expect(result.data).toEqual([]);
+      const query = queryBus.execute.mock
+        .calls[0][0] as GetUserConversationListQuery;
+      expect(query.options.titleSearch).toBe('jan');
     });
   });
 
@@ -218,11 +280,13 @@ describe('ChatWsGateway', () => {
     it('should throw if target is blocked', async () => {
       queryBus.execute.mockResolvedValue({
         id: 'conv-1',
+        type: ConversationType.DIRECT,
         members: [{ userId: 'user-1' }, { userId: 'user-2' }],
       });
-      userIntegrationPort.getUserById.mockResolvedValue({
-        id: 'user-1',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: true,
         isBlocked: false,
@@ -240,12 +304,13 @@ describe('ChatWsGateway', () => {
     it('should create message', async () => {
       queryBus.execute.mockResolvedValue({
         id: 'conv-1',
+        type: ConversationType.DIRECT,
         members: [{ userId: 'user-1' }, { userId: 'user-2' }],
       });
-      userIntegrationPort.getUserById.mockResolvedValue({
-        id: 'user-1',
-        firstName: 'J',
-      } as any);
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1', firstName: 'J', username: 'user1' },
+        { id: 'user-2', firstName: 'M', username: 'user2' },
+      ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
         isBlocked: false,
@@ -268,6 +333,7 @@ describe('ChatWsGateway', () => {
     it('should throw if conversation missing target member', async () => {
       queryBus.execute.mockResolvedValue({
         id: 'conv-1',
+        type: ConversationType.DIRECT,
         members: [{ userId: 'user-1' }],
       });
       await expect(
@@ -316,6 +382,115 @@ describe('ChatWsGateway', () => {
       );
       expect(result.messages.list[0].id).toBe('msg-1');
       expect(result.members).toHaveLength(1); // excluding authUserId
+    });
+  });
+
+  describe('group room membership', () => {
+    const client = {} as any;
+
+    beforeEach(() => {
+      gateway.joinConversationRoom = jest
+        .fn()
+        .mockResolvedValue(undefined) as any;
+      gateway.leaveConversationRoom = jest
+        .fn()
+        .mockResolvedValue(undefined) as any;
+    });
+
+    it('should join the approved user to the group and notify their personal room', async () => {
+      commandBus.execute.mockResolvedValue({ status: 'ACTIVE' });
+
+      await gateway.approveGroupJoinRequest(
+        client,
+        { conversationId: 'conv-1', userId: 'user-2' } as any,
+        'admin-1',
+      );
+
+      expect(gateway.joinConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2'],
+        expect.anything(),
+      );
+    });
+
+    it('should notify and remove a member from the group room', async () => {
+      conversationRepository.getConversationById.mockResolvedValue({
+        id: 'conv-1',
+      } as any);
+      commandBus.execute.mockResolvedValue({});
+
+      await gateway.removeGroupMember(
+        client,
+        { conversationId: 'conv-1', userId: 'user-2' } as any,
+        'admin-1',
+      );
+
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2'],
+        expect.anything(),
+      );
+      expect(gateway.leaveConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+    });
+
+    it('should notify the leaving user and drop them from the group room', async () => {
+      conversationRepository.getConversationById.mockResolvedValue({
+        id: 'conv-1',
+      } as any);
+      commandBus.execute.mockResolvedValue({
+        promotedAdminId: null,
+        conversationDeleted: false,
+      });
+
+      await gateway.leaveGroup(
+        client,
+        { conversationId: 'conv-1' } as any,
+        'user-2',
+      );
+
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2'],
+        expect.anything(),
+      );
+      expect(gateway.leaveConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+    });
+
+    it('should join added members to the group room', async () => {
+      commandBus.execute.mockResolvedValue([
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+      ]);
+
+      await gateway.addGroupMembers(
+        client,
+        { conversationId: 'conv-1', userIds: ['user-2', 'user-3'] } as any,
+        'admin-1',
+      );
+
+      expect(gateway.joinConversationRoom).toHaveBeenCalledWith(
+        'user-2',
+        'conv-1',
+      );
+      expect(gateway.joinConversationRoom).toHaveBeenCalledWith(
+        'user-3',
+        'conv-1',
+      );
+      expect(gateway.broadcast).toHaveBeenCalledWith(
+        client,
+        ['conversation-conv-1', 'user-user-2', 'user-user-3'],
+        expect.anything(),
+      );
     });
   });
 

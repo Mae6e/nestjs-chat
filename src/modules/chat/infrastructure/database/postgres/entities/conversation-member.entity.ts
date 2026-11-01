@@ -12,6 +12,8 @@ import {
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
 import { Message } from '@modules/chat/infrastructure/database/postgres/entities/message.entity';
 import { ConversationMemberEntity } from '@modules/chat/domain/models/conversation-member.model';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 @Entity({ schema: 'chat', name: 'conversation_members' })
 @Index(
@@ -27,6 +29,21 @@ export class ConversationMember {
   @Index('conversation_members_user_id_idx')
   user_id: string;
 
+  @Column({
+    type: 'enum',
+    enum: ConversationMemberRole,
+    default: ConversationMemberRole.USER,
+  })
+  role: ConversationMemberRole;
+
+  @Column({
+    type: 'enum',
+    enum: ConversationMemberStatus,
+    default: ConversationMemberStatus.ACTIVE,
+  })
+  @Index('conversation_members_status_idx')
+  status: ConversationMemberStatus;
+
   @Column({ type: 'uuid' })
   conversation_id: string;
 
@@ -36,13 +53,19 @@ export class ConversationMember {
   @Column({ type: 'uuid', nullable: true })
   last_message_id: string;
 
-  @CreateDateColumn()
+  @Column({ type: 'char', length: 24, nullable: true })
+  updated_by: string | null;
+
+  @Column({ type: 'char', length: 24, nullable: true })
+  deleted_by: string | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
-  @DeleteDateColumn()
+  @DeleteDateColumn({ type: 'timestamptz' })
   deleted_at: Date | null;
 
   @ManyToOne(() => Conversation, (c) => c.conversationMembers, {
@@ -72,9 +95,13 @@ export class ConversationMember {
     const conversationMember = new ConversationMember();
     conversationMember.id = entity.id;
     conversationMember.user_id = entity.userId;
+    conversationMember.role = entity.role;
+    conversationMember.status = entity.status;
     conversationMember.conversation_id = entity.conversationId;
     conversationMember.last_seen_message_id = entity.lastSeenMessageId;
     conversationMember.last_message_id = entity.lastMessageId;
+    conversationMember.updated_by = entity.updatedBy;
+    conversationMember.deleted_by = entity.deletedBy ?? null;
     conversationMember.created_at = entity.createdAt;
     conversationMember.updated_at = entity.updatedAt;
     conversationMember.deleted_at = entity.deletedAt;
@@ -90,12 +117,16 @@ export class ConversationMember {
     const entity = ConversationMemberEntity.reconstruct(
       conversationMember.id,
       conversationMember.user_id,
+      conversationMember.role,
+      conversationMember.status,
       conversationMember.conversation_id,
       conversationMember.last_seen_message_id,
       conversationMember.last_message_id,
       conversationMember.created_at,
       conversationMember.updated_at,
       conversationMember.deleted_at,
+      conversationMember.updated_by ?? null,
+      conversationMember.deleted_by ?? null,
     );
 
     if (conversationMember.conversation) {

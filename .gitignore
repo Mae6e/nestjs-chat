@@ -56,3 +56,4 @@ keys/*
 
 #Help
 *.txt
+keys/access_public.key

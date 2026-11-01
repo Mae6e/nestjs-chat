@@ -18,15 +18,24 @@ export class Conversation {
   @PrimaryColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   title: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   picture: string | null;
 
+  @Column({ type: 'varchar', length: 1000, nullable: true })
+  description: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   @Index('conversations_identifier_uniq', { unique: true })
   identifier: string | null;
+
+  @Column({ type: 'char', length: 24, nullable: true })
+  created_by: string | null;
+
+  @Column({ type: 'char', length: 24, nullable: true })
+  updated_by: string | null;
 
   @Column({
     type: 'enum',
@@ -35,13 +44,13 @@ export class Conversation {
   })
   type: ConversationType;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
-  @DeleteDateColumn()
+  @DeleteDateColumn({ type: 'timestamptz' })
   deleted_at: Date | null;
 
   @OneToMany(() => Message, (m) => m.conversation, {
@@ -59,8 +68,11 @@ export class Conversation {
     const conversation = new Conversation();
     conversation.id = entity.id;
     conversation.title = entity.title;
+    conversation.description = entity.description;
     conversation.picture = entity.picture;
     conversation.identifier = entity.identifier;
+    conversation.created_by = entity.createdBy;
+    conversation.updated_by = entity.updatedBy;
     conversation.type = entity.type;
     conversation.created_at = entity.createdAt;
     conversation.updated_at = entity.updatedAt;
@@ -87,9 +99,12 @@ export class Conversation {
       conversation.type,
       conversation.title,
       conversation.picture,
+      conversation.description,
       conversation.identifier,
       conversation.created_at,
       conversation.updated_at,
+      conversation.created_by,
+      conversation.updated_by,
       conversation.deleted_at,
     );
 

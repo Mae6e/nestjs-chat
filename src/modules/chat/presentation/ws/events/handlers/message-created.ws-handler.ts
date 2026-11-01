@@ -1,14 +1,14 @@
-import { EventsHandler, IEventHandler, QueryBus } from '@nestjs/cqrs';
+import { EventsHandler, IEventHandler } from '@nestjs/cqrs';
 import { MessageCreatedDomainEvent } from '@modules/chat/contracts/events';
 import { ChatWsGateway } from '@modules/chat/presentation/ws/chat-ws.gateway';
 import { Logger } from '@nestjs/common';
 import { UserIntegrationPort } from '@modules/chat/application/ports/user-integration.port';
-import { GetUserConversationQuery } from '@modules/chat/application/queries/get-user-conversation/get-user-conversation.query';
 import {
   UserMessageCreated,
   UserMessageCreatedEvent,
 } from '@modules/chat/presentation/ws/events/message-created.event';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
+import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 @EventsHandler(MessageCreatedDomainEvent)
 export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreatedDomainEvent> {
@@ -17,7 +17,6 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
   constructor(
     private readonly chatWsGateway: ChatWsGateway,
     private readonly userIntegrationPort: UserIntegrationPort,
-    private readonly queryBus: QueryBus,
     private readonly commandRepo: ConversationRepositoryPort,
   ) {}
 
@@ -26,58 +25,78 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
       `Handling MessageCreatedDomainEvent for message ${event.messageId}`,
     );
 
-    // Get conversation to find target users
-    let conversationDto;
-    let senderUserId: string;
-
+    let conversation;
     try {
-      const convEntity = await this.commandRepo.getConversationById(
+      conversation = await this.commandRepo.getConversationById(
         event.conversationId,
       );
-      const senderMember = convEntity.members.find(
-        (m) => m.id === event.senderId,
-      );
-      if (!senderMember) throw new Error('Sender member not found');
-      senderUserId = senderMember.userId;
-
-      conversationDto = await this.queryBus.execute(
-        new GetUserConversationQuery(event.conversationId, senderUserId),
-      );
     } catch {
+      conversation = null;
+    }
+
+    if (!conversation) {
       this.logger.error(
         `Could not find conversation for message ${event.messageId}`,
       );
       return;
     }
 
-    const targetMember = conversationDto.members.find(
-      (member) => member.userId !== senderUserId,
+    const senderMember = conversation.members.find(
+      (m) => m.id === event.senderId,
     );
-
-    if (!targetMember) {
+    if (!senderMember) {
       this.logger.error(
-        `No target member found in conversation ${conversationDto.id}`,
+        `Sender member ${event.senderId} not found in conversation ${event.conversationId}`,
       );
       return;
     }
 
+    const senderUserId = senderMember.userId;
+
+    // Direct conversations shadow blocked messages for the blocked user. Group
+    // conversations deliver to every active member.
+    const recipients = conversation
+      .getActiveMembers()
+      .filter(
+        (member) =>
+          member.userId !== senderUserId &&
+          !event.deletedForUserIds.includes(member.userId),
+      );
+
+    if (recipients.length === 0) {
+      return;
+    }
+
+    const isGroup = conversation.type === ConversationType.GROUP;
+
+    // Direct conversations use per-user rooms. Groups additionally fan out
+    // through a single conversation room, but keep the recipients' personal
+    // rooms as a fallback: a group creator is not in the conversation room
+    // until their socket reconnects, and room membership can lag behind the
+    // database after a join. Socket.IO de-duplicates sockets across rooms, so
+    // each client still receives the message exactly once.
+    const rooms = recipients.map((member) => `user-${member.userId}`);
+    if (isGroup) {
+      rooms.push(`conversation-${conversation.id}`);
+    }
+
+    // The sender already received the message through the send acknowledgement,
+    // so keep excluding all of their devices from this broadcast.
+    const exceptRooms = isGroup
+      ? [
+          `user-${senderUserId}`,
+          ...event.deletedForUserIds.map((userId) => `user-${userId}`),
+        ]
+      : [];
+
     try {
       const users = await this.userIntegrationPort.getUsersByIds([
         senderUserId,
-        targetMember.userId,
       ]);
+      const currentUser = users.find((user) => user.id === senderUserId);
 
-      const currentUser = users.find((u) => u.id === senderUserId);
-      const targetUser = users.find((u) => u.id === targetMember.userId);
-
-      const rooms: string[] = [];
-      if (!event.deletedForUserIds.includes(targetUser.id)) {
-        rooms.push(`user-${targetUser.id}`);
-      }
-      // Also broadcast to the sender's user room for multi-device sync
-      // rooms.push(`user-${currentUser.id}`);
-
-      if (!rooms || !rooms.length) {
+      if (!currentUser) {
+        this.logger.error(`Could not fetch sender ${senderUserId}`);
         return;
       }
 
@@ -96,9 +115,10 @@ export class MessageCreatedWsEventHandler implements IEventHandler<MessageCreate
           },
           content: event.text,
           conversation: {
-            id: conversationDto.id,
+            id: conversation.id,
           },
         }),
+        exceptRooms,
       );
     } catch {
       this.logger.error(`Could not fetch users for message broadcast`);

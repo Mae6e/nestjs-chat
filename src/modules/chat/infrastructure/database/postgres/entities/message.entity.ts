@@ -33,13 +33,13 @@ export class Message {
   @Index('messages_conversation_id_idx')
   conversation_id: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
-  @DeleteDateColumn()
+  @DeleteDateColumn({ type: 'timestamptz' })
   deleted_at: Date | null;
 
   @ManyToOne(() => Conversation, (c) => c.messages, {

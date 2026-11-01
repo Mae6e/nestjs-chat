@@ -7,9 +7,12 @@ import { ConversationRepositoryPort } from '@modules/chat/application/ports/conv
 import { Conversation } from '@modules/chat/infrastructure/database/postgres/entities/conversation.entity';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
+import { ConversationMemberEntity } from '@modules/chat/domain/models/conversation-member.model';
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
 import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
+import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 @Injectable()
 export class ConversationPostgresRepository implements ConversationRepositoryPort {
@@ -133,6 +136,149 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
     });
 
     return res;
+  }
+
+  async getMembership(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationMemberEntity | null> {
+    const member = await this.dataSource
+      .getRepository(ConversationMember)
+      .findOne({
+        where: { conversation_id: conversationId, user_id: userId },
+        withDeleted: true,
+      });
+
+    if (!member) {
+      return null;
+    }
+
+    return ConversationMember.toDomain(member);
+  }
+
+  async countMembers(
+    conversationId: string,
+    status: ConversationMemberStatus = ConversationMemberStatus.ACTIVE,
+  ): Promise<number> {
+    return this.dataSource.getRepository(ConversationMember).count({
+      where: { conversation_id: conversationId, status },
+    });
+  }
+
+  async hasActiveGroupMembership(
+    userId: string,
+    exceptConversationId?: string,
+  ): Promise<boolean> {
+    const query = this.dataSource
+      .getRepository(ConversationMember)
+      .createQueryBuilder('cm')
+      .innerJoin('cm.conversation', 'c')
+      .where('cm.user_id = :userId', { userId })
+      .andWhere('cm.status = :status', {
+        status: ConversationMemberStatus.ACTIVE,
+      })
+      .andWhere('c.type = :type', { type: ConversationType.GROUP });
+
+    if (exceptConversationId) {
+      query.andWhere('cm.conversation_id != :exceptConversationId', {
+        exceptConversationId,
+      });
+    }
+
+    return query.getExists();
+  }
+
+  async deletePendingMembershipsForUser(
+    userId: string,
+    exceptConversationId?: string,
+    deletedBy: string | null = null,
+  ): Promise<number> {
+    return this.dataSource.transaction(async (entityManager) => {
+      const memberRepository = entityManager.getRepository(ConversationMember);
+
+      const query = memberRepository
+        .createQueryBuilder('cm')
+        .select('cm.id', 'id')
+        .where('cm.user_id = :userId', { userId })
+        .andWhere('cm.status = :status', {
+          status: ConversationMemberStatus.PENDING,
+        });
+
+      if (exceptConversationId) {
+        query.andWhere('cm.conversation_id != :exceptConversationId', {
+          exceptConversationId,
+        });
+      }
+
+      const pending = await query.getRawMany<{ id: string }>();
+      if (pending.length === 0) {
+        return 0;
+      }
+
+      const ids = pending.map((row) => row.id);
+
+      const result = await memberRepository
+        .createQueryBuilder()
+        .softDelete()
+        .from(ConversationMember)
+        .whereInIds(ids)
+        .execute();
+
+      if (deletedBy !== null) {
+        await memberRepository
+          .createQueryBuilder()
+          .update(ConversationMember)
+          .set({ deleted_by: deletedBy })
+          .whereInIds(ids)
+          .execute();
+      }
+
+      return result.affected ?? 0;
+    });
+  }
+
+  async saveMember(
+    memberEntity: ConversationMemberEntity,
+  ): Promise<ConversationMemberEntity> {
+    const member = ConversationMember.fromDomain(memberEntity);
+    // `undefined` is ignored by TypeORM save, so make the restored/cleared
+    // soft-delete state explicit.
+    member.deleted_at = memberEntity.deletedAt ?? null;
+
+    const saved = await this.dataSource
+      .getRepository(ConversationMember)
+      .save(member);
+
+    return ConversationMember.toDomain(saved);
+  }
+
+  async softDeleteMember(
+    conversationId: string,
+    userId: string,
+    deletedBy: string | null = null,
+  ): Promise<boolean> {
+    return this.dataSource.transaction(async (entityManager) => {
+      const memberRepository = entityManager.getRepository(ConversationMember);
+
+      const res = await memberRepository
+        .createQueryBuilder()
+        .softDelete()
+        .from(ConversationMember)
+        .where('conversation_id = :conversationId', { conversationId })
+        .andWhere('user_id = :userId', { userId })
+        .execute();
+
+      if (res.affected === 0) {
+        return false;
+      }
+
+      await memberRepository.update(
+        { conversation_id: conversationId, user_id: userId },
+        { deleted_by: deletedBy },
+      );
+
+      return true;
+    });
   }
 
   async block(blockerId: string, blockedId: string): Promise<boolean> {

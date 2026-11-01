@@ -1,5 +1,4 @@
 import {
-  Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
@@ -20,7 +19,7 @@ export class DeletedMessage {
   @PrimaryColumn({ type: 'uuid' })
   message_id: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
   @ManyToOne(() => Message, {

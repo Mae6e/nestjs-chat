@@ -27,7 +27,7 @@ export class CreateMessageHandler implements ICommandHandler<
     }
 
     const member = conversation.members.find((m) => m.userId === senderId);
-    if (!member) {
+    if (!member || !member.isActive()) {
       throw new WsException('User is not a member of the conversation');
     }
 

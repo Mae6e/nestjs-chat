@@ -1,5 +1,8 @@
 import { MessageReadDto } from '@modules/chat/application/dtos/message-read.dto';
-import { ConversationReadDto } from '@modules/chat/application/dtos/conversation-read.dto';
+import {
+  ConversationReadDto,
+  GroupConversationListItemReadDto,
+} from '@modules/chat/application/dtos/conversation-read.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
@@ -12,6 +15,9 @@ import { GetUserConversationListOptions } from '@modules/chat/application/ports/
 import { ConversationMember } from '@modules/chat/infrastructure/database/postgres/entities/conversation-member.entity';
 import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/entities/deleted-message.entity';
 import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
+import { ConversationMemberReadDto } from '@modules/chat/application/dtos/conversation-read.dto';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
+import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 
 import {
   PaginatedResult,
@@ -40,15 +46,21 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
   ): Promise<boolean> {
     const res = await this.conversationRepository
       .createQueryBuilder('c')
-      .innerJoin('c.conversationMembers', 'cm', 'cm.user_id = :userId', {
-        userId,
-      })
+      .innerJoin(
+        'c.conversationMembers',
+        'cm',
+        'cm.user_id = :userId AND cm.status = :active',
+        { userId, active: ConversationMemberStatus.ACTIVE },
+      )
       .where('c.type = :type', { type: 'DIRECT' })
       .andWhereExists(
         this.conversationMemberRepository
           .createQueryBuilder('target_cm')
           .where('target_cm.conversation_id = c.id')
-          .andWhere('target_cm.user_id = :targetUserId', { targetUserId }),
+          .andWhere('target_cm.user_id = :targetUserId', { targetUserId })
+          .andWhere('target_cm.status = :active', {
+            active: ConversationMemberStatus.ACTIVE,
+          }),
       )
       .getExists();
 
@@ -64,8 +76,8 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
       .innerJoinAndSelect(
         'c.conversationMembers',
         'cm',
-        'cm.user_id = :userId',
-        { userId },
+        'cm.user_id = :userId AND cm.status = :active',
+        { userId, active: ConversationMemberStatus.ACTIVE },
       )
       .leftJoinAndSelect('cm.lastSeenMessage', 'lastSeenMessage');
 
@@ -75,15 +87,27 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
         .leftJoinAndSelect('lastMessage.sender', 'lastMessageSender');
     }
 
-    if (options.filterUserIds && options.filterUserIds.length > 0) {
-      query.andWhereExists(
-        this.conversationMemberRepository
-          .createQueryBuilder('cm_filter')
-          .where('cm_filter.user_id IN (:...userIds)', {
-            userIds: options.filterUserIds,
-          })
-          .andWhere('cm_filter.conversation_id = c.id'),
-      );
+    const filterUserIds = options.filterUserIds ?? [];
+    const titleSearch = options.titleSearch?.trim();
+    if (filterUserIds.length > 0 || titleSearch) {
+      const conditions: string[] = [];
+      const parameters: Record<string, unknown> = {};
+
+      if (filterUserIds.length > 0) {
+        // Match conversations containing any of the selected users.
+        conditions.push(
+          'EXISTS (SELECT 1 FROM chat.conversation_members cm_filter WHERE cm_filter.user_id IN (:...filterUserIds) AND cm_filter.conversation_id = c.id)',
+        );
+        parameters.filterUserIds = filterUserIds;
+      }
+
+      if (titleSearch) {
+        // The conversation list `filter` also searches group titles.
+        conditions.push('c.title ILIKE :titleSearch');
+        parameters.titleSearch = `%${titleSearch}%`;
+      }
+
+      query.andWhere(`(${conditions.join(' OR ')})`, parameters);
     }
 
     if (options.type != null) {
@@ -108,7 +132,272 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
 
     const conversationIds = conversations.map((c) => c.id);
 
-    // Fetch not seen counts
+    const notSeenCountsMap = await this.getNotSeenCounts(
+      userId,
+      conversationIds,
+    );
+
+    // Map to DTOs
+    const dtos: ConversationReadDto[] = conversations.map((conv) => {
+      const currentMember = conv.conversationMembers.find(
+        (cm) => cm.user_id === userId,
+      );
+
+      return {
+        id: conv.id,
+        type: conv.type,
+        identifier: conv.identifier,
+        title: conv.title,
+        picture: conv.picture,
+        updatedBy: conv.updated_by ?? null,
+        createdAt: conv.created_at.toISOString(),
+        updatedAt: conv.updated_at.toISOString(),
+        notSeenCount: notSeenCountsMap.get(conv.id) || 0,
+        lastMessage: currentMember?.lastMessage
+          ? {
+              id: currentMember.lastMessage.id,
+              text: currentMember.lastMessage.text,
+              type: currentMember.lastMessage.type,
+              senderId: currentMember.lastMessage.sender
+                ? currentMember.lastMessage.sender.user_id
+                : currentMember.lastMessage.sender_id,
+              createdAt: currentMember.lastMessage.created_at.toISOString(),
+            }
+          : null,
+        members: conv.conversationMembers
+          .filter((cm) => cm.status === ConversationMemberStatus.ACTIVE)
+          .map((cm) => this.mapMemberToDto(cm)),
+      };
+    });
+
+    // Populate all active members (direct has one other, group may have many)
+    const allMembers = await this.conversationMemberRepository
+      .createQueryBuilder('cm')
+      .where('cm.conversation_id IN (:...conversationIds)', { conversationIds })
+      .andWhere('cm.status = :active', {
+        active: ConversationMemberStatus.ACTIVE,
+      })
+      .getMany();
+
+    dtos.forEach((dto) => {
+      const existingIds = new Set(dto.members.map((m) => m.id));
+      const membersForThisConv = allMembers.filter(
+        (m) =>
+          m.conversation_id === dto.id &&
+          m.user_id !== userId &&
+          !existingIds.has(m.id),
+      );
+      membersForThisConv.forEach((m) => {
+        dto.members.push(this.mapMemberToDto(m));
+      });
+    });
+
+    return PaginationHelper.createResult(dtos, count, options.pagination);
+  }
+
+  async getUserGroupConversationList(
+    userId: string,
+    pagination: PaginationOptions,
+    search?: string,
+    joinedOnly?: boolean,
+  ): Promise<PaginatedResult<GroupConversationListItemReadDto>> {
+    const query = this.conversationRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect(
+        'c.conversationMembers',
+        'my_membership',
+        'my_membership.user_id = :userId',
+        { userId },
+      )
+      .where('c.type = :type', { type: ConversationType.GROUP })
+      .orderBy('c.updated_at', 'DESC')
+      .offset(pagination.offset)
+      .limit(pagination.limit);
+
+    const searchTerm = search?.trim();
+    if (searchTerm) {
+      query.andWhere('c.title ILIKE :search', {
+        search: `%${searchTerm}%`,
+      });
+    }
+
+    if (joinedOnly) {
+      query.andWhere('my_membership.status IN (:...memberStatuses)', {
+        memberStatuses: [
+          ConversationMemberStatus.ACTIVE,
+          ConversationMemberStatus.PENDING,
+        ],
+      });
+    }
+
+    const [conversations, count] = await query.getManyAndCount();
+
+    if (conversations.length === 0) {
+      return PaginationHelper.createResult([], count, pagination);
+    }
+
+    const conversationIds = conversations.map((c) => c.id);
+    const notSeenCountsMap = await this.getNotSeenCounts(
+      userId,
+      conversationIds,
+    );
+
+    const memberCounts = await this.conversationMemberRepository
+      .createQueryBuilder('cm_count')
+      .select('cm_count.conversation_id', 'conversationId')
+      .addSelect('COUNT(*)', 'memberCount')
+      .where('cm_count.conversation_id IN (:...conversationIds)', {
+        conversationIds,
+      })
+      .andWhere('cm_count.status = :active', {
+        active: ConversationMemberStatus.ACTIVE,
+      })
+      .groupBy('cm_count.conversation_id')
+      .getRawMany();
+
+    const memberCountsMap = new Map<string, number>();
+    memberCounts.forEach((row) => {
+      memberCountsMap.set(
+        row.conversationId,
+        parseInt(row.memberCount, 10) || 0,
+      );
+    });
+
+    const dtos: GroupConversationListItemReadDto[] = conversations.map(
+      (conv) => {
+        const myMembership = conv.conversationMembers?.find(
+          (cm) => cm.user_id === userId,
+        );
+
+        return {
+          id: conv.id,
+          title: conv.title,
+          description: conv.description,
+          picture: conv.picture,
+          createdAt: conv.created_at.toISOString(),
+          updatedAt: conv.updated_at.toISOString(),
+          memberCount: memberCountsMap.get(conv.id) ?? 0,
+          createdByMe: conv.created_by === userId,
+          notSeenCount: notSeenCountsMap.get(conv.id) || 0,
+          status: myMembership?.status ?? null,
+          ...(myMembership ? { role: myMembership.role } : {}),
+        };
+      },
+    );
+
+    return PaginationHelper.createResult(dtos, count, pagination);
+  }
+
+  async getUserConversationIds(
+    userId: string,
+    options: GetUserConversationIdsOptions,
+  ): Promise<string[]> {
+    const query = this.conversationRepository
+      .createQueryBuilder('c')
+      .select('c.id', 'id')
+      .innerJoin('c.conversationMembers', 'cm', 'cm.user_id = :userId', {
+        userId,
+      })
+      .andWhere('cm.deleted_at IS NULL');
+
+    if (options.type != null) {
+      query.andWhere('c.type = :type', { type: options.type });
+    }
+
+    if (options.status != null) {
+      query.andWhere('cm.status = :status', { status: options.status });
+    }
+
+    const rows = await query.getRawMany<{ id: string }>();
+    return rows.map((r) => r.id);
+  }
+
+  async getUserConversationById(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationReadDto | null> {
+    const res = await this.conversationRepository
+      .createQueryBuilder('c')
+      .innerJoinAndSelect('c.conversationMembers', 'cm')
+      .leftJoinAndSelect('cm.lastSeenMessage', 'lsm')
+      .where('c.id = :conversationId', { conversationId })
+      .andWhereExists(
+        this.conversationMemberRepository
+          .createQueryBuilder('sub_cm')
+          .where('sub_cm.user_id = :userId', { userId })
+          .andWhere('sub_cm.conversation_id = c.id')
+          .andWhere('sub_cm.status = :active', {
+            active: ConversationMemberStatus.ACTIVE,
+          }),
+      )
+      .getOne();
+
+    if (!res) {
+      return null;
+    }
+
+    const dto: ConversationReadDto = {
+      id: res.id,
+      type: res.type,
+      identifier: res.identifier,
+      title: res.title,
+      picture: res.picture,
+      updatedBy: res.updated_by ?? null,
+      createdAt: res.created_at.toISOString(),
+      updatedAt: res.updated_at.toISOString(),
+      notSeenCount: 0,
+      lastMessage: null,
+      members: res.conversationMembers
+        .filter((cm) => cm.status === ConversationMemberStatus.ACTIVE)
+        .map((cm) => this.mapMemberToDto(cm)),
+    };
+
+    return dto;
+  }
+
+  async getGroupMembers(
+    conversationId: string,
+    status?: ConversationMemberStatus,
+  ): Promise<ConversationMemberReadDto[]> {
+    const query = this.conversationMemberRepository
+      .createQueryBuilder('cm')
+      .where('cm.conversation_id = :conversationId', { conversationId });
+
+    if (status) {
+      query.andWhere('cm.status = :status', { status });
+    }
+
+    query.orderBy('cm.created_at', 'ASC');
+    const members = await query.getMany();
+    return members.map((m) => this.mapMemberToDto(m));
+  }
+
+  async getGroupJoinRequests(
+    conversationId: string,
+    pagination: PaginationOptions,
+  ): Promise<PaginatedResult<ConversationMemberReadDto>> {
+    const [members, count] = await this.conversationMemberRepository
+      .createQueryBuilder('cm')
+      .where('cm.conversation_id = :conversationId', { conversationId })
+      .andWhere('cm.status = :status', {
+        status: ConversationMemberStatus.PENDING,
+      })
+      .orderBy('cm.created_at', 'ASC')
+      .offset(pagination.offset)
+      .limit(pagination.limit)
+      .getManyAndCount();
+
+    return PaginationHelper.createResult(
+      members.map((m) => this.mapMemberToDto(m)),
+      count,
+      pagination,
+    );
+  }
+
+  private async getNotSeenCounts(
+    userId: string,
+    conversationIds: string[],
+  ): Promise<Map<string, number>> {
     const notSeenCountsQuery = await this.conversationMemberRepository
       .createQueryBuilder('cm')
       .select('cm.conversation_id', 'conversationId')
@@ -143,139 +432,24 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
       );
     });
 
-    // Map to DTOs
-    const dtos: ConversationReadDto[] = conversations.map((conv) => {
-      const currentMember = conv.conversationMembers.find(
-        (cm) => cm.user_id === userId,
-      );
-
-      return {
-        id: conv.id,
-        type: conv.type,
-        identifier: conv.identifier,
-        title: conv.title,
-        picture: conv.picture,
-        createdAt: conv.created_at.toISOString(),
-        updatedAt: conv.updated_at.toISOString(),
-        notSeenCount: notSeenCountsMap.get(conv.id) || 0,
-        lastMessage: currentMember?.lastMessage
-          ? {
-              id: currentMember.lastMessage.id,
-              text: currentMember.lastMessage.text,
-              type: currentMember.lastMessage.type,
-              senderId: currentMember.lastMessage.sender
-                ? currentMember.lastMessage.sender.user_id
-                : currentMember.lastMessage.sender_id,
-              createdAt: currentMember.lastMessage.created_at.toISOString(),
-            }
-          : null,
-        members: conv.conversationMembers.map((cm) => ({
-          id: cm.id,
-          userId: cm.user_id,
-          lastSeenMessageId: cm.last_seen_message_id,
-          lastSeenMessage: cm.lastSeenMessage
-            ? {
-                createdAt: cm.lastSeenMessage.created_at.toISOString(),
-              }
-            : null,
-          lastMessageId: cm.last_message_id,
-        })),
-      };
-    });
-
-    // Populate other members for direct conversations manually if needed
-    const allMembers = await this.conversationMemberRepository
-      .createQueryBuilder('cm')
-      .where('cm.conversation_id IN (:...conversationIds)', { conversationIds })
-      .getMany();
-
-    dtos.forEach((dto) => {
-      const membersForThisConv = allMembers.filter(
-        (m) => m.conversation_id === dto.id && m.user_id !== userId,
-      );
-      membersForThisConv.forEach((m) => {
-        dto.members.push({
-          id: m.id,
-          userId: m.user_id,
-          lastSeenMessageId: m.last_seen_message_id,
-          lastSeenMessage: m.lastSeenMessage
-            ? {
-                createdAt: m.lastSeenMessage.created_at.toISOString(),
-              }
-            : null,
-          lastMessageId: m.last_message_id,
-        });
-      });
-    });
-
-    return PaginationHelper.createResult(dtos, count, options.pagination);
+    return notSeenCountsMap;
   }
 
-  async getUserConversationIds(
-    userId: string,
-    options: GetUserConversationIdsOptions,
-  ): Promise<string[]> {
-    const query = this.conversationRepository
-      .createQueryBuilder('c')
-      .select('c.id', 'id')
-      .innerJoin('c.conversationMembers', 'cm', 'cm.user_id = :userId', {
-        userId,
-      });
-
-    if (options.type != null) {
-      query.andWhere('c.type = :type', { type: options.type });
-    }
-
-    const res = await query.getMany().then((rows) => rows.map((c) => c.id));
-
-    return res;
-  }
-
-  async getUserConversationById(
-    conversationId: string,
-    userId: string,
-  ): Promise<ConversationReadDto | null> {
-    const res = await this.conversationRepository
-      .createQueryBuilder('c')
-      .innerJoinAndSelect('c.conversationMembers', 'cm')
-      .leftJoinAndSelect('cm.lastSeenMessage', 'lsm')
-      .where('c.id = :conversationId', { conversationId })
-      .andWhereExists(
-        this.conversationMemberRepository
-          .createQueryBuilder('sub_cm')
-          .where('sub_cm.user_id = :userId', { userId })
-          .andWhere('sub_cm.conversation_id = c.id'),
-      )
-      .getOne();
-
-    if (!res) {
-      return null;
-    }
-
-    const dto: ConversationReadDto = {
-      id: res.id,
-      type: res.type,
-      identifier: res.identifier,
-      title: res.title,
-      picture: res.picture,
-      createdAt: res.created_at.toISOString(),
-      updatedAt: res.updated_at.toISOString(),
-      notSeenCount: 0,
-      lastMessage: null,
-      members: res.conversationMembers.map((cm) => ({
-        id: cm.id,
-        userId: cm.user_id,
-        lastSeenMessageId: cm.last_seen_message_id,
-        lastSeenMessage: cm.lastSeenMessage
-          ? {
-              createdAt: cm.lastSeenMessage.created_at.toISOString(),
-            }
-          : null,
-        lastMessageId: cm.last_message_id,
-      })),
+  private mapMemberToDto(cm: ConversationMember): ConversationMemberReadDto {
+    return {
+      id: cm.id,
+      userId: cm.user_id,
+      role: cm.role,
+      status: cm.status,
+      lastSeenMessageId: cm.last_seen_message_id,
+      lastSeenMessage: cm.lastSeenMessage
+        ? {
+            createdAt: cm.lastSeenMessage.created_at.toISOString(),
+          }
+        : null,
+      lastMessageId: cm.last_message_id,
+      updatedBy: cm.updated_by ?? null,
     };
-
-    return dto;
   }
 
   async getUserConversationMessageList(

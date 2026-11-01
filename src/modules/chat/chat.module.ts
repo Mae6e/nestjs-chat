@@ -17,6 +17,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { authConfig } from '@infrastructure/config/auth.config';
 import { ChatHttpGuard } from './presentation/http/guards/chat-http.guard';
 import { PlatformApiModule } from '@infrastructure/platform-api/platform-api.module';
+import { uploadConfig } from '@infrastructure/upload/upload.config';
+import { FileStoragePort } from './application/ports/file-storage.port';
+import { LocalFileStorageAdapter } from './infrastructure/adapters/local-file-storage.adapter';
 
 @Module({
   imports: [
@@ -24,6 +27,7 @@ import { PlatformApiModule } from '@infrastructure/platform-api/platform-api.mod
     ChatDatabaseModule,
     ConfigModule,
     ConfigModule.forFeature(authConfig),
+    ConfigModule.forFeature(uploadConfig),
     JwtModule.register({
       signOptions: {
         algorithm: 'RS256',
@@ -50,6 +54,10 @@ import { PlatformApiModule } from '@infrastructure/platform-api/platform-api.mod
     {
       provide: UserIntegrationPort,
       useClass: UserIntegrationAdapter,
+    },
+    {
+      provide: FileStoragePort,
+      useClass: LocalFileStorageAdapter,
     },
   ],
   controllers: [ChatHttpController],

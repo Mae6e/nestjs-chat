@@ -4,8 +4,13 @@ import {
   PaginatedResult,
   PaginationOptions,
 } from '@common/pagination/pagination.interface';
-import { ConversationReadDto } from '@modules/chat/application/dtos/conversation-read.dto';
+import {
+  ConversationMemberReadDto,
+  ConversationReadDto,
+  GroupConversationListItemReadDto,
+} from '@modules/chat/application/dtos/conversation-read.dto';
 import { MessageReadDto } from '@modules/chat/application/dtos/message-read.dto';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 
 export abstract class ConversationReadRepositoryPort {
   abstract getUserConversationById(
@@ -23,6 +28,13 @@ export abstract class ConversationReadRepositoryPort {
     options: GetUserConversationListOptions,
   ): Promise<PaginatedResult<ConversationReadDto>>;
 
+  abstract getUserGroupConversationList(
+    userId: string,
+    pagination: PaginationOptions,
+    search?: string,
+    joinedOnly?: boolean,
+  ): Promise<PaginatedResult<GroupConversationListItemReadDto>>;
+
   abstract getUserConversationIds(
     userId: string,
     options: GetUserConversationIdsOptions,
@@ -33,6 +45,16 @@ export abstract class ConversationReadRepositoryPort {
     userId: string,
     pagination: PaginationOptions,
   ): Promise<PaginatedResult<MessageReadDto>>;
+
+  abstract getGroupMembers(
+    conversationId: string,
+    status?: ConversationMemberStatus,
+  ): Promise<ConversationMemberReadDto[]>;
+
+  abstract getGroupJoinRequests(
+    conversationId: string,
+    pagination: PaginationOptions,
+  ): Promise<PaginatedResult<ConversationMemberReadDto>>;
 
   abstract getBlockStatus(
     userId: string,

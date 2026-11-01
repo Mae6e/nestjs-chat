@@ -46,6 +46,134 @@ export class ConversationNotFoundException extends DomainException {
   }
 }
 
+export class NotAGroupConversationException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Conversation is not a group: ${reason}`
+        : 'Conversation is not a group',
+      'CHAT_NOT_A_GROUP',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupAdminRequiredException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Admin privileges required: ${reason}`
+        : 'Only group admins can perform this action',
+      'CHAT_GROUP_ADMIN_REQUIRED',
+      'FORBIDDEN',
+    );
+  }
+}
+
+export class GroupMemberLimitExceededException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group has reached its maximum number of members: ${reason}`
+        : 'Group has reached its maximum number of members',
+      'CHAT_GROUP_MEMBER_LIMIT_EXCEEDED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupMemberAlreadyExistsException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `User is already a member of the group: ${reason}`
+        : 'User is already a member of the group',
+      'CHAT_GROUP_MEMBER_ALREADY_EXISTS',
+      'CONFLICT',
+    );
+  }
+}
+
+export class GroupMemberRequestPendingException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `User already has a pending request to join the group: ${reason}`
+        : 'User already has a pending request to join the group',
+      'CHAT_GROUP_MEMBER_REQUEST_PENDING',
+      'CONFLICT',
+    );
+  }
+}
+
+export class UserAlreadyInGroupException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `User already belongs to a group: ${reason}`
+        : 'User already belongs to a group',
+      'CHAT_USER_ALREADY_IN_GROUP',
+      'CONFLICT',
+    );
+  }
+}
+
+export class GroupMemberNotFoundException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason ? `Group member not found: ${reason}` : 'Group member not found',
+      'CHAT_GROUP_MEMBER_NOT_FOUND',
+      'NOT_FOUND',
+    );
+  }
+}
+
+export class GroupJoinRequestNotFoundException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason ? `Join request not found: ${reason}` : 'Join request not found',
+      'CHAT_GROUP_JOIN_REQUEST_NOT_FOUND',
+      'NOT_FOUND',
+    );
+  }
+}
+
+export class LastGroupAdminException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group must keep at least one admin: ${reason}`
+        : 'Group must keep at least one admin',
+      'CHAT_GROUP_LAST_ADMIN',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupOwnerCannotBeRemovedException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group owner cannot be removed: ${reason}`
+        : 'Group owner cannot be removed',
+      'CHAT_GROUP_OWNER_CANNOT_BE_REMOVED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class CannotRemoveSelfException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `You cannot remove yourself from the group: ${reason}`
+        : 'You cannot remove yourself from the group',
+      'CHAT_CANNOT_REMOVE_SELF',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
 export class ChatDomainError extends DomainException {
   constructor(message: string) {
     super(message, 'CHAT_DOMAIN_ERROR', 'BUSINESS_RULE');
@@ -82,6 +210,42 @@ export class InvalidCredentialsException extends DomainException {
         : 'Username or password combination is invalid',
       'USER_INVALID_CREDENTIALS',
       'UNAUTHORIZED',
+    );
+  }
+}
+
+export class GroupMemberRoleUnchangedException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group member role is unchanged: ${reason}`
+        : 'Group member already has this role',
+      'CHAT_GROUP_MEMBER_ROLE_UNCHANGED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupOwnerRoleCannotBeChangedException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group owner role cannot be changed: ${reason}`
+        : 'Group owner role cannot be changed',
+      'CHAT_GROUP_OWNER_ROLE_CANNOT_BE_CHANGED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class GroupMemberCannotChangeOwnRoleException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Group member cannot change their own role: ${reason}`
+        : 'Group member cannot change their own role',
+      'CHAT_GROUP_MEMBER_CANNOT_CHANGE_OWN_ROLE',
+      'BUSINESS_RULE',
     );
   }
 }

@@ -5,7 +5,10 @@ import { DatabaseType } from '@infrastructure/database/database-type.enum';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
+import { UserBlock } from '../entities/user-block.entity';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
+import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
 
 describe('ConversationPostgresReadRepository', () => {
   let repository: ConversationPostgresReadRepository;
@@ -14,6 +17,7 @@ describe('ConversationPostgresReadRepository', () => {
   let conversationRepoMock: any;
   let messageRepoMock: any;
   let conversationMemberRepoMock: any;
+  let userBlockRepoMock: any;
 
   beforeEach(async () => {
     queryBuilderMock = {
@@ -28,6 +32,7 @@ describe('ConversationPostgresReadRepository', () => {
       from: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
       offset: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       setParameter: jest.fn().mockReturnThis(),
@@ -48,6 +53,10 @@ describe('ConversationPostgresReadRepository', () => {
     };
 
     conversationMemberRepoMock = {
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
+    };
+
+    userBlockRepoMock = {
       createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
     };
 
@@ -82,6 +91,10 @@ describe('ConversationPostgresReadRepository', () => {
             DatabaseType.POSTGRES,
           ),
           useValue: conversationMemberRepoMock,
+        },
+        {
+          provide: getRepositoryToken(UserBlock, DatabaseType.POSTGRES),
+          useValue: userBlockRepoMock,
         },
         {
           provide: getDataSourceToken(DatabaseType.POSTGRES),
@@ -146,13 +159,272 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data[0].id).toBe('conv-1');
       expect(result.data[0].notSeenCount).toBe(1);
     });
+
+    it('should match conversations by user filter or title search', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+        filterUserIds: ['user-2'],
+        titleSearch: '  team  ',
+      });
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        '(EXISTS (SELECT 1 FROM chat.conversation_members cm_filter WHERE cm_filter.user_id IN (:...filterUserIds) AND cm_filter.conversation_id = c.id) OR c.title ILIKE :titleSearch)',
+        { filterUserIds: ['user-2'], titleSearch: '%team%' },
+      );
+    });
+
+    it('should search conversation titles without a user filter', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+        titleSearch: 'team',
+      });
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        '(c.title ILIKE :titleSearch)',
+        { titleSearch: '%team%' },
+      );
+    });
+
+    it('should filter by conversation type', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+        type: ConversationType.GROUP,
+      });
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith('c.type = :type', {
+        type: ConversationType.GROUP,
+      });
+    });
+  });
+
+  describe('getUserGroupConversationList', () => {
+    it('should return all groups without filtering by membership', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00.000Z');
+      const updatedAt = new Date('2024-01-02T00:00:00.000Z');
+
+      queryBuilderMock.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'group-mine',
+            type: ConversationType.GROUP,
+            identifier: 'should-not-be-returned',
+            title: 'My group',
+            description: 'My group description',
+            picture: null,
+            created_by: 'user-1',
+            created_at: createdAt,
+            updated_at: updatedAt,
+          },
+          {
+            id: 'group-other',
+            type: ConversationType.GROUP,
+            identifier: 'should-not-be-returned',
+            title: 'Another group',
+            description: null,
+            picture: null,
+            created_by: 'user-2',
+            created_at: createdAt,
+            updated_at: updatedAt,
+          },
+        ],
+        2,
+      ]);
+      queryBuilderMock.getRawMany
+        .mockResolvedValueOnce([
+          { conversationId: 'group-mine', notSeenCount: '3' },
+          { conversationId: 'group-other', notSeenCount: '0' },
+        ])
+        .mockResolvedValueOnce([
+          { conversationId: 'group-mine', memberCount: '2' },
+          { conversationId: 'group-other', memberCount: '4' },
+        ]);
+
+      const result = await repository.getUserGroupConversationList('user-1', {
+        page: 1,
+        pageSize: 10,
+        limit: 10,
+        offset: 0,
+      });
+
+      expect(queryBuilderMock.innerJoin).not.toHaveBeenCalled();
+      expect(queryBuilderMock.innerJoinAndSelect).not.toHaveBeenCalled();
+      expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
+      expect(queryBuilderMock.leftJoinAndSelect).toHaveBeenCalledWith(
+        'c.conversationMembers',
+        'my_membership',
+        'my_membership.user_id = :userId',
+        { userId: 'user-1' },
+      );
+      expect(queryBuilderMock.where).toHaveBeenCalledWith('c.type = :type', {
+        type: ConversationType.GROUP,
+      });
+      expect(result.data).toEqual([
+        {
+          id: 'group-mine',
+          title: 'My group',
+          description: 'My group description',
+          picture: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+          memberCount: 2,
+          createdByMe: true,
+          notSeenCount: 3,
+          status: null,
+        },
+        {
+          id: 'group-other',
+          title: 'Another group',
+          description: null,
+          picture: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+          memberCount: 4,
+          createdByMe: false,
+          notSeenCount: 0,
+          status: null,
+        },
+      ]);
+      expect(result.data[0]).not.toHaveProperty('identifier');
+      expect(result.data[0]).not.toHaveProperty('lastMessage');
+      expect(result.data[0]).not.toHaveProperty('updatedBy');
+      expect(result.data[0]).not.toHaveProperty('type');
+    });
+
+    it('should filter groups by title', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserGroupConversationList(
+        'user-1',
+        {
+          page: 1,
+          pageSize: 10,
+          limit: 10,
+          offset: 0,
+        },
+        '  team  ',
+      );
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'c.title ILIKE :search',
+        { search: '%team%' },
+      );
+    });
+
+    it('should include groups where the user is an active or pending member', async () => {
+      queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await repository.getUserGroupConversationList(
+        'user-1',
+        {
+          page: 1,
+          pageSize: 10,
+          limit: 10,
+          offset: 0,
+        },
+        undefined,
+        true,
+      );
+
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'my_membership.status IN (:...memberStatuses)',
+        {
+          memberStatuses: [
+            ConversationMemberStatus.ACTIVE,
+            ConversationMemberStatus.PENDING,
+          ],
+        },
+      );
+      expect(queryBuilderMock.innerJoinAndSelect).not.toHaveBeenCalled();
+      expect(queryBuilderMock.andWhereExists).not.toHaveBeenCalled();
+    });
+
+    it('should map the current user membership status and role', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00.000Z');
+      const updatedAt = new Date('2024-01-02T00:00:00.000Z');
+      queryBuilderMock.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'group-1',
+            type: ConversationType.GROUP,
+            title: 'Team',
+            description: 'The team group',
+            picture: null,
+            created_by: 'user-2',
+            created_at: createdAt,
+            updated_at: updatedAt,
+            conversationMembers: [
+              {
+                user_id: 'user-1',
+                status: ConversationMemberStatus.PENDING,
+                role: ConversationMemberRole.USER,
+              },
+            ],
+          },
+        ],
+        1,
+      ]);
+      queryBuilderMock.getRawMany
+        .mockResolvedValueOnce([
+          { conversationId: 'group-1', notSeenCount: '0' },
+        ])
+        .mockResolvedValueOnce([
+          { conversationId: 'group-1', memberCount: '3' },
+        ]);
+
+      const result = await repository.getUserGroupConversationList(
+        'user-1',
+        {
+          page: 1,
+          pageSize: 10,
+          limit: 10,
+          offset: 0,
+        },
+        undefined,
+        true,
+      );
+
+      expect(result.data[0]).toEqual({
+        id: 'group-1',
+        title: 'Team',
+        description: 'The team group',
+        picture: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T00:00:00.000Z',
+        memberCount: 3,
+        createdByMe: false,
+        notSeenCount: 0,
+        status: ConversationMemberStatus.PENDING,
+        role: ConversationMemberRole.USER,
+      });
+      expect(result.data[0]).not.toHaveProperty('type');
+    });
   });
 
   describe('getUserConversationIds', () => {
     it('should return array of ids', async () => {
-      queryBuilderMock.getMany.mockResolvedValue([{ id: 'conv-1' }]);
+      queryBuilderMock.getRawMany.mockResolvedValue([{ id: 'conv-1' }]);
       const result = await repository.getUserConversationIds('user-1', {});
       expect(result).toEqual(['conv-1']);
+    });
+
+    it('should filter by membership status when requested', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([{ id: 'conv-1' }]);
+
+      const result = await repository.getUserConversationIds('user-1', {
+        status: ConversationMemberStatus.ACTIVE,
+      });
+
+      expect(result).toEqual(['conv-1']);
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm.status = :status',
+        { status: ConversationMemberStatus.ACTIVE },
+      );
     });
   });
 
