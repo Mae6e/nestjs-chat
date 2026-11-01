@@ -479,6 +479,7 @@ export class ChatHttpController {
         id: item.id,
         title: item.title,
         picture: this.fileStorage.getGroupPictureUrl(item.picture),
+        description: item.description,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
         memberCount: item.memberCount,

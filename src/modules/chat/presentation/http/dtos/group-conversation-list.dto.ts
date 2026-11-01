@@ -74,16 +74,16 @@ export class GroupConversationListItemDto {
       'Current user membership status in this group; null when the user is not a member.',
   })
   status: ConversationMemberStatus | null;
-}
 
-export class MyGroupConversationListItemDto extends GroupConversationListItemDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
     description: 'Group description.',
   })
   description: string | null;
+}
 
+export class MyGroupConversationListItemDto extends GroupConversationListItemDto {
   @ApiProperty({ enum: ConversationMemberRole })
   role: ConversationMemberRole;
 
