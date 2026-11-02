@@ -217,6 +217,12 @@ export class ChatWsGateway
     if (!currentUser || !targetUser) {
       throw new WsException('User not found.');
     }
+    if (!currentUser.isDmEnabled) {
+      throw new WsException('You have disabled direct messages.');
+    }
+    if (!targetUser.isDmEnabled) {
+      throw new WsException('Unable to send a message to this user.');
+    }
 
     const blockStatus = await this.userIntegrationPort.getBlockStatus(
       authUserId,
@@ -389,6 +395,7 @@ export class ChatWsGateway
           identifier: item.identifier,
           identifierAvatarIndex: 0,
           identifierAvatar: undefined,
+          identifierIsDmEnabled: false,
           memberCount: item.members.length,
           lastMessage: null,
           notSeenCount: item?.notSeenCount ?? 0,
@@ -400,6 +407,7 @@ export class ChatWsGateway
             conversation.identifier = otherUser.username;
             conversation.identifierAvatarIndex = otherUser.avatarIndex;
             conversation.identifierAvatar = otherUser.avatar;
+            conversation.identifierIsDmEnabled = otherUser.isDmEnabled;
           }
         } else if (!isDirect) {
           conversation.identifier = item.title ?? item.identifier ?? '';
@@ -472,6 +480,12 @@ export class ChatWsGateway
 
       if (!currentUser || !targetUser) {
         throw new WsException('User not found.');
+      }
+      if (!currentUser.isDmEnabled) {
+        throw new WsException('You have disabled direct messages.');
+      }
+      if (!targetUser.isDmEnabled) {
+        throw new WsException('Unable to send a message to this user.');
       }
 
       const blockStatus = await this.userIntegrationPort.getBlockStatus(

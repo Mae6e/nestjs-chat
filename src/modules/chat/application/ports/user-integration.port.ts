@@ -3,6 +3,7 @@ export interface ChatUser {
   username: string;
   avatarIndex: number;
   avatar?: string;
+  isDmEnabled: boolean;
 }
 
 export interface BlockStatus {

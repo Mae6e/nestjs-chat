@@ -56,6 +56,7 @@ export class UserConversationListItem {
   identifier: string;
   identifierAvatarIndex: number;
   identifierAvatar?: string;
+  identifierIsDmEnabled: boolean;
   memberCount: number;
   notSeenCount: number;
   lastMessage: UserConversationListItemMessage;

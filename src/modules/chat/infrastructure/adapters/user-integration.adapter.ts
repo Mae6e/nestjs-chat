@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   BlockStatus,
+  ChatUser,
   UserIntegrationPort,
 } from '@modules/chat/application/ports/user-integration.port';
 import { QueryBus } from '@nestjs/cqrs';
@@ -20,7 +21,7 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
     return response.data;
   }
 
-  async getUserById(id: string): Promise<any | null> {
+  async getUserById(id: string): Promise<ChatUser | null> {
     const response: { data: any } = await this.client.get(`${id}`);
     return response.data;
   }
@@ -29,7 +30,7 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
     return null;
   }
 
-  async getUsersByIds(userIds: string[]): Promise<any[]> {
+  async getUsersByIds(userIds: string[]): Promise<ChatUser[]> {
     const response: { data: any[] } = await this.client.post(`batch`, {
       ids: userIds,
     });
