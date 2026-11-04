@@ -135,14 +135,13 @@ export class ChatWsGateway
           `Failed to load group rooms for user ${authPayload.sub}: ${(e as Error).message}`,
         );
       }
-
       this.logger.debug(
         `Joining user ${authPayload.sub} to rooms ${rooms.join(', ')}`,
       );
       client.join(rooms);
 
       this.logger.log(`Client authorized: ${authPayload.sub}`);
-      client.emit('ready');
+      client.emit('ready', 'you are connected.');
     } catch (e) {
       this.logger.debug(
         `Error during connection: ${(e as Error).message}. disconnecting...`,
@@ -159,6 +158,7 @@ export class ChatWsGateway
     } else {
       this.logger.debug(`Unknown client ${client.id} disconnected`);
     }
+    client.disconnect(true);
   }
 
   private conversationRoom(conversationId: string): string {
