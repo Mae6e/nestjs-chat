@@ -301,6 +301,17 @@ export class ChatWsGateway
       }),
     );
 
+    try {
+      await this.userIntegrationPort.setHasConversation(
+        authUserId,
+        data.targetUserId,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed Update the user's hasChat ${authUserId} friends ${data.targetUserId}`,
+      );
+    }
+
     //? ack message
     return {
       id: createConversation.id,

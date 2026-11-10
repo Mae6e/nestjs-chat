@@ -87,8 +87,8 @@ describe('ChatWsGateway', () => {
   describe('createDirectConversation', () => {
     it('should throw if target user is blocked', async () => {
       userIntegrationPort.getUsersByIds.mockResolvedValue([
-        { id: 'user-1' },
-        { id: 'user-2' },
+        { id: 'user-1', isDmEnabled: true },
+        { id: 'user-2', isDmEnabled: true },
       ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: true,
@@ -111,12 +111,14 @@ describe('ChatWsGateway', () => {
           firstName: 'John',
           lastName: 'Doe',
           username: 'johndoe',
+          isDmEnabled: true,
         },
         {
           id: 'user-2',
           firstName: 'Jane',
           lastName: 'Smith',
           username: 'janesmith',
+          isDmEnabled: true,
         },
       ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
@@ -146,8 +148,8 @@ describe('ChatWsGateway', () => {
 
     it('should rollback conversation if message creation fails', async () => {
       userIntegrationPort.getUsersByIds.mockResolvedValue([
-        { id: 'user-1' },
-        { id: 'user-2' },
+        { id: 'user-1', isDmEnabled: true },
+        { id: 'user-2', isDmEnabled: true },
       ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
@@ -284,8 +286,8 @@ describe('ChatWsGateway', () => {
         members: [{ userId: 'user-1' }, { userId: 'user-2' }],
       });
       userIntegrationPort.getUsersByIds.mockResolvedValue([
-        { id: 'user-1' },
-        { id: 'user-2' },
+        { id: 'user-1', isDmEnabled: true },
+        { id: 'user-2', isDmEnabled: true },
       ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: true,
@@ -308,8 +310,18 @@ describe('ChatWsGateway', () => {
         members: [{ userId: 'user-1' }, { userId: 'user-2' }],
       });
       userIntegrationPort.getUsersByIds.mockResolvedValue([
-        { id: 'user-1', firstName: 'J', username: 'user1' },
-        { id: 'user-2', firstName: 'M', username: 'user2' },
+        {
+          id: 'user-1',
+          firstName: 'J',
+          username: 'user1',
+          isDmEnabled: true,
+        },
+        {
+          id: 'user-2',
+          firstName: 'M',
+          username: 'user2',
+          isDmEnabled: true,
+        },
       ] as any);
       userIntegrationPort.getBlockStatus.mockResolvedValue({
         isBlocker: false,
@@ -397,7 +409,7 @@ describe('ChatWsGateway', () => {
         .mockResolvedValue(undefined) as any;
     });
 
-    it('should join the approved user to the group and notify their personal room', async () => {
+    it('should join the approved user to the group room before broadcasting', async () => {
       commandBus.execute.mockResolvedValue({ status: 'ACTIVE' });
 
       await gateway.approveGroupJoinRequest(
@@ -412,7 +424,7 @@ describe('ChatWsGateway', () => {
       );
       expect(gateway.broadcast).toHaveBeenCalledWith(
         client,
-        ['conversation-conv-1', 'user-user-2'],
+        ['conversation-conv-1'],
         expect.anything(),
       );
     });
@@ -431,7 +443,7 @@ describe('ChatWsGateway', () => {
 
       expect(gateway.broadcast).toHaveBeenCalledWith(
         client,
-        ['conversation-conv-1', 'user-user-2'],
+        ['conversation-conv-1'],
         expect.anything(),
       );
       expect(gateway.leaveConversationRoom).toHaveBeenCalledWith(
@@ -457,7 +469,7 @@ describe('ChatWsGateway', () => {
 
       expect(gateway.broadcast).toHaveBeenCalledWith(
         client,
-        ['conversation-conv-1', 'user-user-2'],
+        ['conversation-conv-1'],
         expect.anything(),
       );
       expect(gateway.leaveConversationRoom).toHaveBeenCalledWith(

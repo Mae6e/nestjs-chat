@@ -1,13 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import {
   BlockStatus,
+  ChatFriend,
   ChatUser,
+  GetFriendsOptions,
   UserIntegrationPort,
 } from '@modules/chat/application/ports/user-integration.port';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetBlockStatusQuery } from '@modules/chat/application/queries/get-block-status/get-block-status.query';
 import { GetBlockedUsersIdsQuery } from '@modules/chat/application/queries/get-blocked-users-ids/get-blocked-users-ids.query';
 import { PlatformApiClient } from '@infrastructure/platform-api/platform-api.client';
+
+interface PlatformFriend {
+  userId?: string;
+  friendId?: string;
+  userName?: string;
+  name?: string;
+  userAvatar?: string | null;
+  userIndexAvatar?: number;
+  isDmEnabled?: boolean;
+}
 
 @Injectable()
 export class UserIntegrationAdapter implements UserIntegrationPort {
@@ -26,7 +38,7 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
     return response.data;
   }
 
-  async getUserIdsByNameOrUsername(username: string): Promise<any | null> {
+  async getUserIdsByNameOrUsername(): Promise<any | null> {
     return null;
   }
 
@@ -36,6 +48,31 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
     });
     return response.data;
   }
+
+  // async getFriends(
+  //   userId: string,
+  //   options: GetFriendsOptions = {},
+  // ): Promise<ChatFriend[]> {
+  //   const body: Record<string, unknown> = {};
+  //   if (options.isDmEnabled !== undefined) {
+  //     body.isDmEnabled = options.isDmEnabled;
+  //   }
+  //   if (options.userIds) {
+  //     body.userIds = options.userIds;
+  //   }
+
+  //   const response = await this.client.post<{ data?: PlatformFriend[] }>(
+  //     `${userId}/friends/search`,
+  //     body,
+  //   );
+
+  //   return (response.data ?? []).map((friend) => ({
+  //     id: friend.userId ?? friend.friendId,
+  //     username: friend.userName ?? friend.name,
+  //     avatarIndex: friend.userIndexAvatar ?? 0,
+  //     avatar: friend.userAvatar ?? undefined,
+  //   }));
+  // }
 
   async hasBlockRelation(userA: string, userB: string): Promise<boolean> {
     const res = await this.queryBus.execute(
@@ -58,5 +95,9 @@ export class UserIntegrationAdapter implements UserIntegrationPort {
     targetUserId: string,
   ): Promise<BlockStatus> {
     return this.queryBus.execute(new GetBlockStatusQuery(userId, targetUserId));
+  }
+
+  async setHasConversation(userId: string, friendId: string): Promise<void> {
+    await this.client.post(`${userId}/friends/${friendId}/conversation`);
   }
 }

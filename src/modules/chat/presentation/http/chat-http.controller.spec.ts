@@ -15,6 +15,7 @@ import { UpdateGroupConversationCommand } from '@modules/chat/application/comman
 import { GetUserGroupConversationListQuery } from '@modules/chat/application/queries/get-user-group-conversation-list/get-user-group-conversation-list.query';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
+import { UserIntegrationPort } from '@modules/chat/application/ports/user-integration.port';
 import { ChatWsGateway } from '@modules/chat/presentation/ws/chat-ws.gateway';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { ConversationMemberRole } from '@modules/chat/domain/enums/conversation-member-role.enum';
@@ -26,6 +27,7 @@ describe('ChatHttpController', () => {
   let queryBus: jest.Mocked<QueryBus>;
   let fileStorage: jest.Mocked<FileStoragePort>;
   let conversationRepository: jest.Mocked<ConversationRepositoryPort>;
+  let userIntegrationPort: jest.Mocked<UserIntegrationPort>;
   let chatWsGateway: jest.Mocked<ChatWsGateway>;
 
   const pictureFile: UploadedFilePayload = {
@@ -63,6 +65,11 @@ describe('ChatHttpController', () => {
       getConversationById: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<ConversationRepositoryPort>;
 
+    userIntegrationPort = {
+      getUsersByIds: jest.fn(),
+      getFriends: jest.fn(),
+    } as unknown as jest.Mocked<UserIntegrationPort>;
+
     chatWsGateway = {
       server: {},
       serverBroadcast: jest.fn().mockResolvedValue(true),
@@ -87,6 +94,10 @@ describe('ChatHttpController', () => {
         {
           provide: ConversationRepositoryPort,
           useValue: conversationRepository,
+        },
+        {
+          provide: UserIntegrationPort,
+          useValue: userIntegrationPort,
         },
         {
           provide: ChatWsGateway,
@@ -592,6 +603,42 @@ describe('ChatHttpController', () => {
       ).rejects.toThrow('not an admin');
 
       expect(fileStorage.deleteGroupPicture).toHaveBeenCalledWith('new.png');
+    });
+  });
+
+  describe('getFriends', () => {
+    it('should return the platform friends and forward the isDmEnabled filter', async () => {
+      const friends = [
+        {
+          id: 'user-2',
+          username: 'jane',
+          avatarIndex: 1,
+          avatar: 'jane.png',
+          isDmEnabled: true,
+        },
+      ];
+      userIntegrationPort.getFriends.mockResolvedValue(friends);
+
+      const result = await controller.getFriends(
+        { isDmEnabled: true },
+        'auth-user',
+      );
+
+      expect(userIntegrationPort.getFriends).toHaveBeenCalledWith('auth-user', {
+        isDmEnabled: true,
+      });
+      expect(result).toEqual(friends);
+    });
+
+    it('should not filter when isDmEnabled is omitted', async () => {
+      userIntegrationPort.getFriends.mockResolvedValue([]);
+
+      const result = await controller.getFriends({}, 'auth-user');
+
+      expect(userIntegrationPort.getFriends).toHaveBeenCalledWith('auth-user', {
+        isDmEnabled: undefined,
+      });
+      expect(result).toEqual([]);
     });
   });
 });

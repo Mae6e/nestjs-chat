@@ -312,6 +312,29 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     return rows.map((r) => r.id);
   }
 
+  async getDirectMessageUserIds(userId: string): Promise<string[]> {
+    const rows = await this.conversationMemberRepository
+      .createQueryBuilder('cm')
+      .innerJoin('cm.conversation', 'c')
+      .innerJoin(
+        'c.conversationMembers',
+        'self_cm',
+        'self_cm.user_id = :userId AND self_cm.status = :active AND self_cm.deleted_at IS NULL',
+        { userId, active: ConversationMemberStatus.ACTIVE },
+      )
+      .where('c.type = :type', { type: ConversationType.DIRECT })
+      .andWhere('c.deleted_at IS NULL')
+      .andWhere('cm.user_id <> :userId', { userId })
+      .andWhere('cm.status = :active', {
+        active: ConversationMemberStatus.ACTIVE,
+      })
+      .andWhere('cm.deleted_at IS NULL')
+      .select('DISTINCT cm.user_id', 'userId')
+      .getRawMany<{ userId: string }>();
+
+    return rows.map((row) => row.userId);
+  }
+
   async getUserConversationById(
     conversationId: string,
     userId: string,

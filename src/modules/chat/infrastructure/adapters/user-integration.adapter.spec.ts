@@ -3,21 +3,28 @@ import { UserIntegrationAdapter } from './user-integration.adapter';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetBlockStatusQuery } from '@modules/chat/application/queries/get-block-status/get-block-status.query';
 import { GetBlockedUsersIdsQuery } from '@modules/chat/application/queries/get-blocked-users-ids/get-blocked-users-ids.query';
-import { UserNotFoundException } from '@modules/chat/domain/chat.exceptions';
+import { PlatformApiClient } from '@infrastructure/platform-api/platform-api.client';
 
 describe('UserIntegrationAdapter', () => {
   let adapter: UserIntegrationAdapter;
   let queryBusMock: any;
+  let clientMock: any;
 
   beforeEach(async () => {
     queryBusMock = {
       execute: jest.fn(),
     };
 
+    clientMock = {
+      get: jest.fn(),
+      post: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserIntegrationAdapter,
         { provide: QueryBus, useValue: queryBusMock },
+        { provide: PlatformApiClient, useValue: clientMock },
       ],
     }).compile();
 
@@ -29,25 +36,18 @@ describe('UserIntegrationAdapter', () => {
   });
 
   describe('doesUserExist', () => {
-    //   it('should return true if user exists', async () => {
-    //     queryBusMock.execute.mockResolvedValue({});
-    //     const result = await adapter.doesUserExist('user-1');
-    //     expect(result).toBe(true);
-    //     expect(queryBusMock.execute).toHaveBeenCalledWith(
-    //       new GetUserByIdQuery('user-1'),
-    //     );
-    //   });
+    it('should return the platform result', async () => {
+      clientMock.get.mockResolvedValue({ data: true });
 
-    it('should return false if UserNotFoundException is thrown', async () => {
-      queryBusMock.execute.mockRejectedValue(
-        new UserNotFoundException('user-1'),
-      );
       const result = await adapter.doesUserExist('user-1');
-      expect(result).toBe(false);
+
+      expect(result).toBe(true);
+      expect(clientMock.get).toHaveBeenCalledWith('user-1/exists');
     });
 
-    it('should throw if other error occurs', async () => {
-      queryBusMock.execute.mockRejectedValue(new Error('Other error'));
+    it('should throw if the platform call fails', async () => {
+      clientMock.get.mockRejectedValue(new Error('Other error'));
+
       await expect(adapter.doesUserExist('user-1')).rejects.toThrow(
         'Other error',
       );
@@ -88,38 +88,93 @@ describe('UserIntegrationAdapter', () => {
 
   describe('getUserById', () => {
     it('should return ChatUser', async () => {
-      queryBusMock.execute.mockResolvedValue({
-        id: 'user-1',
-        username: 'test',
-        firstName: 'Test',
-        lastName: 'User',
-        avatar: null,
+      clientMock.get.mockResolvedValue({
+        data: {
+          id: 'user-1',
+          username: 'test',
+          firstName: 'Test',
+          lastName: 'User',
+          avatar: null,
+        },
       });
+
       const result = await adapter.getUserById('user-1');
+
       expect(result.id).toBe('user-1');
       expect(result.username).toBe('test');
+      expect(clientMock.get).toHaveBeenCalledWith('user-1');
     });
   });
 
-  // describe('getUsersByIds', () => {
-  //   it('should return array of ChatUsers', async () => {
-  //     queryBusMock.execute.mockResolvedValue([
-  //       {
-  //         id: 'user-1',
-  //         username: 'test',
-  //         firstName: 'Test',
-  //         lastName: 'User',
-  //         avatar: null,
-  //       },
-  //     ]);
-  //     const result = await adapter.getUsersByIds(['user-1']);
-  //     expect(result).toHaveLength(1);
-  //     expect(result[0].id).toBe('user-1');
-  //     expect(queryBusMock.execute).toHaveBeenCalledWith(
-  //       new GetUsersByIdsQuery(['user-1']),
-  //     );
-  //   });
-  // });
+  describe('getUsersByIds', () => {
+    it('should send the ids to the platform batch endpoint', async () => {
+      const users = [
+        { id: 'user-1', username: 'test', avatarIndex: 1, isDmEnabled: true },
+      ];
+      clientMock.post.mockResolvedValue({ data: users });
+
+      const result = await adapter.getUsersByIds(['user-1']);
+
+      expect(clientMock.post).toHaveBeenCalledWith('batch', {
+        ids: ['user-1'],
+      });
+      expect(result).toEqual(users);
+    });
+  });
+
+  describe('getFriends', () => {
+    it('should call the platform friends endpoint with the isDmEnabled filter', async () => {
+      clientMock.get.mockResolvedValue({
+        data: [
+          {
+            userId: 'user-2',
+            userName: 'jane',
+            userAvatar: 'jane.png',
+            userIndexAvatar: 1,
+            isDmEnabled: false,
+          },
+          {
+            friendId: 'user-3',
+            name: 'john',
+            isDmEnabled: true,
+          },
+        ],
+      });
+
+      const result = await adapter.getFriends('user-1', {
+        isDmEnabled: false,
+      });
+
+      expect(clientMock.get).toHaveBeenCalledWith('user-1/friends', {
+        isDmEnabled: false,
+      });
+      expect(result).toEqual([
+        {
+          id: 'user-2',
+          username: 'jane',
+          avatarIndex: 1,
+          avatar: 'jane.png',
+          isDmEnabled: false,
+        },
+        {
+          id: 'user-3',
+          username: 'john',
+          avatarIndex: 0,
+          avatar: undefined,
+          isDmEnabled: true,
+        },
+      ]);
+    });
+
+    it('should omit the filter when isDmEnabled is not provided', async () => {
+      clientMock.get.mockResolvedValue({ data: [] });
+
+      const result = await adapter.getFriends('user-1');
+
+      expect(clientMock.get).toHaveBeenCalledWith('user-1/friends', {});
+      expect(result).toEqual([]);
+    });
+  });
 
   // describe('getUserIdsByNameOrUsername', () => {
   //   it('should return array of ids', async () => {

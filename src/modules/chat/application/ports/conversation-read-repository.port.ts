@@ -40,6 +40,12 @@ export abstract class ConversationReadRepositoryPort {
     options: GetUserConversationIdsOptions,
   ): Promise<string[]>;
 
+  /**
+   * Returns the IDs of every other user the given user has a direct
+   * conversation with. Blocked users are included.
+   */
+  abstract getDirectMessageUserIds(userId: string): Promise<string[]>;
+
   abstract getUserConversationMessageList(
     conversationId: string,
     userId: string,

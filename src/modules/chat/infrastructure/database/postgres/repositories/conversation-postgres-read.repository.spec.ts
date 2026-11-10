@@ -428,6 +428,38 @@ describe('ConversationPostgresReadRepository', () => {
     });
   });
 
+  describe('getDirectMessageUserIds', () => {
+    it('should return the other members of direct conversations', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+      ]);
+
+      const result = await repository.getDirectMessageUserIds('user-1');
+
+      expect(result).toEqual(['user-2', 'user-3']);
+      expect(queryBuilderMock.where).toHaveBeenCalledWith('c.type = :type', {
+        type: ConversationType.DIRECT,
+      });
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'cm.user_id <> :userId',
+        { userId: 'user-1' },
+      );
+      expect(queryBuilderMock.select).toHaveBeenCalledWith(
+        'DISTINCT cm.user_id',
+        'userId',
+      );
+    });
+
+    it('should return an empty array when the user has no direct conversations', async () => {
+      queryBuilderMock.getRawMany.mockResolvedValue([]);
+
+      const result = await repository.getDirectMessageUserIds('user-1');
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('getUserConversationById', () => {
     it('should return null if not found', async () => {
       queryBuilderMock.getOne.mockResolvedValue(null);

@@ -140,6 +140,29 @@ export class ChatHttpController {
     return this.mapMyGroupConversationListResponse(result);
   }
 
+  // @ApiOperation({
+  //   summary: 'List friends',
+  //   description:
+  //     'Returns the profiles of every user the current user has a direct conversation with. Blocked users are included, and `isDmEnabled` shows whether each user currently accepts direct messages.',
+  // })
+  // @ApiBaseResponse(ChatFriendDto, { isArray: true })
+  // @ResponseMessage('Friends retrieved successfully')
+  // @Get('friends')
+  // @UseGuards(ChatHttpGuard)
+  // async getFriends(
+  //   @Query() query: GetFriendsQueryDto,
+  //   @CurrentUserId() authUserId: string,
+  // ): Promise<ChatFriendDto[]> {
+  //   const userIds = await this.queryBus.execute(
+  //     new GetDirectMessageUserIdsQuery(authUserId),
+  //   );
+
+  //   return this.userIntegrationPort.getFriends(authUserId, {
+  //     isDmEnabled: query.isDmEnabled,
+  //     userIds: userIds || [],
+  //   });
+  // }
+
   @ApiOperation({
     summary: 'Create group conversation',
     description:

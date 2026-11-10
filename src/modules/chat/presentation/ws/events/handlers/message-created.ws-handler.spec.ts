@@ -85,6 +85,7 @@ describe('MessageCreatedWsEventHandler', () => {
           id: 'user-1',
           username: 'username-user-1',
           avatarIndex: 1,
+          isDmEnabled: true,
         },
       ]);
 
@@ -117,6 +118,7 @@ describe('MessageCreatedWsEventHandler', () => {
           id: 'user-1',
           username: 'username-user-1',
           avatarIndex: 1,
+          isDmEnabled: true,
         },
       ]);
 
@@ -149,6 +151,7 @@ describe('MessageCreatedWsEventHandler', () => {
           id: 'user-1',
           username: 'username-user-1',
           avatarIndex: 1,
+          isDmEnabled: true,
         },
       ]);
 

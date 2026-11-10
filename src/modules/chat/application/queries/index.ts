@@ -7,11 +7,13 @@ import { GetBlockStatusHandler } from './get-block-status/get-block-status.handl
 import { GetGroupMembersHandler } from './get-group-members/get-group-members.handler';
 import { GetGroupJoinRequestsHandler } from './get-group-join-requests/get-group-join-requests.handler';
 import { GetUserGroupConversationListHandler } from './get-user-group-conversation-list/get-user-group-conversation-list.handler';
+import { GetDirectMessageUserIdsHandler } from './get-direct-message-user-ids/get-direct-message-user-ids.handler';
 
 export const QueryHandlers = [
   GetUserConversationListHandler,
   GetUserGroupConversationListHandler,
   GetUserConversationIdsHandler,
+  GetDirectMessageUserIdsHandler,
   GetUserConversationHandler,
   GetUserConversationMessageListHandler,
   GetBlockStatusHandler,
