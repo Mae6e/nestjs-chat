@@ -335,7 +335,7 @@ Error responses use `data: null` and keep the HTTP status code and message:
   "data": null,
   "statusCode": 409,
   "message": "User is already blocked",
-  "error": "Conflict"
+  "code": "Conflict"
 }
 ```
 
@@ -420,7 +420,8 @@ Clients receive the following broadcast and direct events:
 | `conversation.group.left`                | `{ conversationId, userId }`                        | Emitted when a member leaves the group.                                 |
 | `user.blocked`                           | `{ blockerId: string, blockedId: string }`          | Emitted to both parties when a block relation is created.               |
 | `user.unblocked`                         | `{ blockerId: string, blockedId: string }`          | Emitted to both parties when a block relation is removed.               |
-| `error.server`                           | `{ statusCode: number, message: string }`           | Emitted when an exception occurs during request processing.             |
+| `error.client`                           | `{ statusCode: number, message: string, code: string }` | Emitted when the initial socket authorization fails.                 |
+| `error.server`                           | `{ statusCode: number, message: string, code: string }` | Emitted when an exception occurs during request processing.          |
 
 ---
 

@@ -40,7 +40,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
           data: null,
           statusCode: httpStatus,
           message: message,
-          error: code,
+          code,
         },
         httpStatus,
       );
@@ -53,12 +53,15 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         typeof response === 'string'
           ? { message: response }
           : (response as Record<string, unknown>);
+      const { error, code, ...responseBody } = body;
+      const responseCode = code ?? error;
 
       return httpAdapter.reply(
         ctx.getResponse(),
         {
           statusCode: exception.getStatus(),
-          ...body,
+          ...responseBody,
+          ...(responseCode !== undefined ? { code: responseCode } : {}),
           data: null,
         },
         exception.getStatus(),

@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { WsException } from '@nestjs/websockets';
 import { ClientData } from '@common/websocket/interfaces/client-data.interface';
@@ -44,9 +49,14 @@ export abstract class BaseWsAuthGuard implements CanActivate {
       this.logger.debug(`Error from authentication: ${(e as Error).message}`);
       client.data.authPromise = null;
       if (data && typeof data.ack === 'function') {
-        data.ack({ error: 'Unauthorized', statusCode: 401 });
+        data.ack({
+          statusCode: HttpStatus.UNAUTHORIZED,
+          message: 'Unauthorized',
+          code: 'UNAUTHENTICATED',
+        });
       }
       throw new WsException({
+        statusCode: HttpStatus.UNAUTHORIZED,
         code: 'UNAUTHENTICATED',
         message: (e as Error).message,
       });
@@ -59,7 +69,13 @@ export abstract class BaseWsAuthGuard implements CanActivate {
     }
 
     const accessToken = this.extractToken(client);
-    if (!accessToken) throw new WsException('Unauthorized');
+    if (!accessToken) {
+      throw new WsException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Unauthorized',
+        code: 'UNAUTHENTICATED',
+      });
+    }
 
     try {
       const verifyRes = await this.verifyToken(accessToken);
@@ -71,7 +87,11 @@ export abstract class BaseWsAuthGuard implements CanActivate {
       return verifyRes;
     } catch (e) {
       this.logger.warn(`Error verifying access token: ${(e as Error).message}`);
-      throw new WsException('Unauthorized');
+      throw new WsException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Unauthorized',
+        code: 'UNAUTHENTICATED',
+      });
     }
   }
 
@@ -87,10 +107,18 @@ export abstract class BaseWsAuthGuard implements CanActivate {
     data: any,
   ) {
     if (data && typeof data.ack === 'function') {
-      data.ack({ error: 'Unauthorized', statusCode: 401 });
+      data.ack({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Unauthorized',
+        code: 'UNAUTHENTICATED',
+      });
     }
     client.data = null;
     client.disconnect(true);
-    throw new WsException({ code: 'UNAUTHENTICATED', message: 'Unauthorized' });
+    throw new WsException({
+      statusCode: HttpStatus.UNAUTHORIZED,
+      message: 'Unauthorized',
+      code: 'UNAUTHENTICATED',
+    });
   }
 }

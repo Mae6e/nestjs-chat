@@ -1,6 +1,6 @@
 import { CommandHandler, EventPublisher, ICommandHandler } from '@nestjs/cqrs';
 import { CreateMessageCommand } from './create-message.command';
-import { Logger } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { WsException } from '@nestjs/websockets';
@@ -23,12 +23,20 @@ export class CreateMessageHandler implements ICommandHandler<
     const conversation =
       await this.commandRepo.getConversationById(conversationId);
     if (!conversation) {
-      throw new WsException('Conversation not found');
+      throw new WsException({
+        statusCode: HttpStatus.NOT_FOUND,
+        message: 'Conversation not found',
+        code: 'CHAT_CONVERSATION_NOT_FOUND',
+      });
     }
 
     const member = conversation.members.find((m) => m.userId === senderId);
     if (!member || !member.isActive()) {
-      throw new WsException('User is not a member of the conversation');
+      throw new WsException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'User is not a member of the conversation',
+        code: 'CHAT_CONVERSATION_ACCESS_DENIED',
+      });
     }
 
     const message = this.publisher.mergeObjectContext(

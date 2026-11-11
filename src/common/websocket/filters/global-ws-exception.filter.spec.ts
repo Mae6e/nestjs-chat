@@ -10,18 +10,28 @@ describe('GlobalWsExceptionFilter', () => {
 
   describe('catch', () => {
     it('should format and emit WsException', () => {
-      const exception = new WsException('custom error');
+      const exception = new WsException({
+        statusCode: 404,
+        message: 'Conversation not found',
+        code: 'CHAT_CONVERSATION_NOT_FOUND',
+      });
       const client = { emit: jest.fn() };
+      const callback = jest.fn();
       const host = {
         switchToWs: () => ({
           getClient: () => client,
           getPattern: () => 'pattern',
         }),
-        getArgs: () => [client, {}, jest.fn()],
+        getArgs: () => [client, {}, callback],
       } as any;
 
       filter.catch(exception, host);
 
+      expect(callback).toHaveBeenCalledWith({
+        statusCode: 404,
+        message: 'Conversation not found',
+        code: 'CHAT_CONVERSATION_NOT_FOUND',
+      });
       expect(client.emit).not.toHaveBeenCalledWith(
         'error.server',
         expect.anything(),
@@ -29,7 +39,11 @@ describe('GlobalWsExceptionFilter', () => {
     });
 
     it('should call the ack callback when Nest appends the event pattern after it', () => {
-      const exception = new WsException('custom error');
+      const exception = new WsException({
+        statusCode: 400,
+        message: 'custom error',
+        code: 'WS_CUSTOM_ERROR',
+      });
       const client = { emit: jest.fn() };
       const callback = jest.fn();
       const host = {
@@ -45,6 +59,7 @@ describe('GlobalWsExceptionFilter', () => {
       expect(callback).toHaveBeenCalledWith({
         statusCode: 400,
         message: 'custom error',
+        code: 'WS_CUSTOM_ERROR',
       });
       expect(client.emit).not.toHaveBeenCalledWith(
         'error.server',
@@ -68,6 +83,7 @@ describe('GlobalWsExceptionFilter', () => {
       expect(client.emit).toHaveBeenCalledWith('error.server', {
         statusCode: 500,
         message: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR',
       });
     });
   });

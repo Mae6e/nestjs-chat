@@ -27,7 +27,7 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
-import { Logger, UseFilters, UseGuards } from '@nestjs/common';
+import { HttpStatus, Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { ChatWsGuard } from '@modules/chat/presentation/ws/guards/chat-ws.guard';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
@@ -215,13 +215,25 @@ export class ChatWsGateway
     const targetUser = users.find((u) => u.id === data.targetUserId);
 
     if (!currentUser || !targetUser) {
-      throw new WsException('User not found.');
+      throw new WsException({
+        statusCode: HttpStatus.NOT_FOUND,
+        message: 'User not found.',
+        code: 'USER_NOT_FOUND',
+      });
     }
     if (!currentUser.isDmEnabled) {
-      throw new WsException('You have disabled direct messages.');
+      throw new WsException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'You have disabled direct messages.',
+        code: 'CHAT_DIRECT_MESSAGES_DISABLED',
+      });
     }
     if (!targetUser.isDmEnabled) {
-      throw new WsException('Unable to send a message to this user.');
+      throw new WsException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'Unable to send a message to this user.',
+        code: 'CHAT_TARGET_DIRECT_MESSAGES_DISABLED',
+      });
     }
 
     const blockStatus = await this.userIntegrationPort.getBlockStatus(
@@ -229,7 +241,11 @@ export class ChatWsGateway
       targetUser.id,
     );
     if (blockStatus.isBlocker) {
-      throw new WsException('You have blocked this user.');
+      throw new WsException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'You have blocked this user.',
+        code: 'CHAT_BLOCKED_USER',
+      });
     }
 
     const createConversation = await this.commandBus.execute(
@@ -478,7 +494,11 @@ export class ChatWsGateway
         (member) => member.userId !== authUserId,
       );
       if (!targetMember) {
-        throw new WsException('Conversation not found');
+        throw new WsException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Conversation not found',
+          code: 'CHAT_CONVERSATION_NOT_FOUND',
+        });
       }
 
       const users = await this.userIntegrationPort.getUsersByIds([
@@ -490,13 +510,25 @@ export class ChatWsGateway
       targetUser = users.find((u) => u.id === targetMember.userId);
 
       if (!currentUser || !targetUser) {
-        throw new WsException('User not found.');
+        throw new WsException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'User not found.',
+          code: 'USER_NOT_FOUND',
+        });
       }
       if (!currentUser.isDmEnabled) {
-        throw new WsException('You have disabled direct messages.');
+        throw new WsException({
+          statusCode: HttpStatus.FORBIDDEN,
+          message: 'You have disabled direct messages.',
+          code: 'CHAT_DIRECT_MESSAGES_DISABLED',
+        });
       }
       if (!targetUser.isDmEnabled) {
-        throw new WsException('Unable to send a message to this user.');
+        throw new WsException({
+          statusCode: HttpStatus.FORBIDDEN,
+          message: 'Unable to send a message to this user.',
+          code: 'CHAT_TARGET_DIRECT_MESSAGES_DISABLED',
+        });
       }
 
       const blockStatus = await this.userIntegrationPort.getBlockStatus(
@@ -505,9 +537,11 @@ export class ChatWsGateway
       );
 
       if (blockStatus.isBlocker) {
-        throw new WsException(
-          'You need to unblock the user before sending a message.',
-        );
+        throw new WsException({
+          statusCode: HttpStatus.FORBIDDEN,
+          message: 'You need to unblock the user before sending a message.',
+          code: 'CHAT_BLOCKED_USER',
+        });
       }
 
       deletedForUserIds = blockStatus.isBlocked ? [targetUser.id] : [];
@@ -516,7 +550,11 @@ export class ChatWsGateway
       currentUser = users.find((u) => u.id === authUserId);
 
       if (!currentUser) {
-        throw new WsException('User not found.');
+        throw new WsException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'User not found.',
+          code: 'USER_NOT_FOUND',
+        });
       }
     }
 
@@ -661,7 +699,11 @@ export class ChatWsGateway
     // Verify user is a member of the conversation
     const isMember = conversation.members.some((m) => m.userId === authUserId);
     if (!isMember) {
-      throw new WsException('Conversation not found or access denied');
+      throw new WsException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'Conversation not found or access denied',
+        code: 'CHAT_CONVERSATION_ACCESS_DENIED',
+      });
     }
 
     // Execute the command to update the read status in the DB

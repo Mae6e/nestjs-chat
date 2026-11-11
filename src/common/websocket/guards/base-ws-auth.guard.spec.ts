@@ -11,7 +11,11 @@ class TestWsGuard extends BaseWsAuthGuard {
     if (client.handshake.auth.token === 'valid') {
       return { sub: 'user-1' };
     }
-    throw new WsException('auth failed');
+    throw new WsException({
+      statusCode: 401,
+      message: 'auth failed',
+      code: 'UNAUTHENTICATED',
+    });
   }
 }
 
