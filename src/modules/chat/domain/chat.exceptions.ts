@@ -250,6 +250,66 @@ export class GroupMemberCannotChangeOwnRoleException extends DomainException {
   }
 }
 
+export class CannotReportSelfException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `You cannot report yourself: ${reason}`
+        : 'You cannot report yourself',
+      'CHAT_CANNOT_REPORT_SELF',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class ReportAlreadyExistsException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `A pending report already exists: ${reason}`
+        : 'A pending report already exists for this conversation and user',
+      'CHAT_REPORT_ALREADY_EXISTS',
+      'CONFLICT',
+    );
+  }
+}
+
+export class NotADirectConversationException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Conversation is not a direct conversation: ${reason}`
+        : 'Conversation is not a direct conversation',
+      'CHAT_NOT_A_DIRECT_CONVERSATION',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class ReportTargetNotInConversationException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Report target is not a member of the conversation: ${reason}`
+        : 'Report target is not a member of the conversation',
+      'CHAT_REPORT_TARGET_NOT_IN_CONVERSATION',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
+export class ReportDescriptionRequiredException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Report description is required: ${reason}`
+        : 'Report description is required',
+      'CHAT_REPORT_DESCRIPTION_REQUIRED',
+      'BUSINESS_RULE',
+    );
+  }
+}
+
 export class UserDomainError extends DomainException {
   constructor(message: string) {
     super(message, 'USER_DOMAIN_ERROR', 'BUSINESS_RULE');

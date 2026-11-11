@@ -12,6 +12,8 @@ import {
 import { CreateGroupConversationCommand } from '@modules/chat/application/commands/create-group-conversation/create-group-conversation.command';
 import { DeleteConversationCommand } from '@modules/chat/application/commands/delete-conversation/delete-conversation.command';
 import { UpdateGroupConversationCommand } from '@modules/chat/application/commands/update-group-conversation/update-group-conversation.command';
+import { ReportDirectMessageCommand } from '@modules/chat/application/commands/report-direct-message/report-direct-message.command';
+import { ReportEntity } from '@modules/chat/domain/models/report.model';
 import { GetUserGroupConversationListQuery } from '@modules/chat/application/queries/get-user-group-conversation-list/get-user-group-conversation-list.query';
 import { ConversationEntity } from '@modules/chat/domain/models/conversation.model';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
@@ -312,6 +314,39 @@ describe('ChatHttpController', () => {
         new UnblockUserCommand('auth-user', 'target-1'),
       );
       expect(result).toEqual({});
+    });
+  });
+
+  describe('reportDirectMessage', () => {
+    it('should execute ReportDirectMessageCommand and map the report', async () => {
+      const report = ReportEntity.createDirect(
+        'auth-user',
+        'target-1',
+        'conversation-1',
+        'abusive messages',
+      );
+
+      commandBus.execute.mockResolvedValue(report);
+
+      const result = await controller.reportDirectMessage(
+        {
+          conversationId: 'conversation-1',
+          description: 'abusive messages',
+        },
+        'auth-user',
+      );
+
+      expect(commandBus.execute).toHaveBeenCalledWith(
+        new ReportDirectMessageCommand(
+          'auth-user',
+          'conversation-1',
+          'abusive messages',
+        ),
+      );
+      expect(result).toEqual({
+        id: report.id,
+        createdAt: report.createdAt.toISOString(),
+      });
     });
   });
 

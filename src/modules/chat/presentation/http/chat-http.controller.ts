@@ -71,6 +71,12 @@ import { GetUserGroupConversationListQuery } from '@modules/chat/application/que
 import { PaginationHelper } from '@common/pagination/pagination.helper';
 import { ResponseMessage } from '@common/http/decorators/response-message.decorator';
 import { ApiBaseResponse } from '@common/http/decorators/api-base-response.decorator';
+import {
+  ReportDirectMessageHttpRequest,
+  ReportDirectMessageHttpResponse,
+} from '@modules/chat/presentation/http/dtos/report.dto';
+import { ReportDirectMessageCommand } from '@modules/chat/application/commands/report-direct-message/report-direct-message.command';
+import { ReportEntity } from '@modules/chat/domain/models/report.model';
 
 const MAX_GROUP_PICTURE_SIZE = 1 * 1024 * 1024;
 
@@ -491,6 +497,38 @@ export class ChatHttpController {
     );
 
     return null;
+  }
+
+  @ApiOperation({
+    summary: 'Report a direct message conversation',
+    description:
+      'Reports the other user in a direct conversation. The client sends only the conversation id and a description. A user can have only one pending report per conversation and target user.',
+  })
+  @ApiBaseResponse(ReportDirectMessageHttpResponse, { created: true })
+  @ApiConflictResponse({
+    type: null,
+    description:
+      'A pending report already exists for this user and conversation',
+  })
+  @Post('report/direct-message')
+  @ResponseMessage('Report submitted successfully')
+  @UseGuards(ChatHttpGuard)
+  async reportDirectMessage(
+    @Body() body: ReportDirectMessageHttpRequest,
+    @CurrentUserId() authUserId: string,
+  ): Promise<ReportDirectMessageHttpResponse> {
+    const report: ReportEntity = await this.commandBus.execute(
+      new ReportDirectMessageCommand(
+        authUserId,
+        body.conversationId,
+        body.description,
+      ),
+    );
+
+    return {
+      id: report.id,
+      createdAt: report.createdAt.toISOString(),
+    };
   }
 
   private mapGroupConversationListResponse(

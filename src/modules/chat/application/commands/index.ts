@@ -12,6 +12,7 @@ import { RemoveGroupMemberHandler } from './remove-group-member/remove-group-mem
 import { ChangeGroupMemberRoleHandler } from './change-group-member-role/change-group-member-role.handler';
 import { UpdateGroupConversationHandler } from './update-group-conversation/update-group-conversation.handler';
 import { LeaveGroupHandler } from './leave-group/leave-group.handler';
+import { ReportDirectMessageHandler } from './report-direct-message/report-direct-message.handler';
 
 export const CommandHandlers = [
   CreateDirectConversationHandler,
@@ -28,4 +29,5 @@ export const CommandHandlers = [
   ChangeGroupMemberRoleHandler,
   UpdateGroupConversationHandler,
   LeaveGroupHandler,
+  ReportDirectMessageHandler,
 ];
