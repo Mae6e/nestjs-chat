@@ -485,15 +485,15 @@ export class ChatHttpController {
   @ApiBaseResponse(UnblockResponse, {
     description: 'Successfully unblocked the user',
   })
-  @Delete('/user/block/:targetUserId')
+  @Delete('/user/block')
   @ResponseMessage('User unblocked successfully')
   @UseGuards(ChatHttpGuard)
   async unblock(
-    @Param() params: UnblockRequestParams,
+    @Body() body: UnblockRequestParams,
     @CurrentUserId() authUserId: string,
   ): Promise<UnblockResponse> {
     await this.commandBus.execute(
-      new UnblockUserCommand(authUserId, params.targetUserId),
+      new UnblockUserCommand(authUserId, body.targetUserId),
     );
 
     return null;
