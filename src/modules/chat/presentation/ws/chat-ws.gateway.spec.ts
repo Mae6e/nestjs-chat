@@ -382,8 +382,8 @@ describe('ChatWsGateway', () => {
         });
 
       userIntegrationPort.getUsersByIds.mockResolvedValue([
-        { id: 'user-1', firstName: 'J' },
-        { id: 'user-2', firstName: 'M' },
+        { id: 'user-1', firstName: 'J', isDmEnabled: true },
+        { id: 'user-2', firstName: 'M', isDmEnabled: false },
       ] as any);
       userIntegrationPort.getBlockedUsersIds.mockResolvedValue([]);
 
@@ -394,6 +394,7 @@ describe('ChatWsGateway', () => {
       );
       expect(result.messages.list[0].id).toBe('msg-1');
       expect(result.members).toHaveLength(1); // excluding authUserId
+      expect(result.members[0].isDmEnabled).toBe(false);
     });
   });
 

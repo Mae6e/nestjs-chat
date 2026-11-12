@@ -39,6 +39,7 @@ export class UserConversationMessageMember {
   avatar?: string;
   username?: string;
   isBlocked: boolean;
+  isDmEnabled: boolean;
 }
 
 export class GetConversationMessageListResponse {

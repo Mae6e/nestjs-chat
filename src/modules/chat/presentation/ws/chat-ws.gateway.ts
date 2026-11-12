@@ -654,6 +654,7 @@ export class ChatWsGateway
           avatar: m.avatar,
           role: conversation.members.find((cm) => cm.userId === m.id)?.role,
           isBlocked: blockedUserIds.includes(m.id),
+          isDmEnabled: m.isDmEnabled,
         })),
       messages: {
         total: messageList.meta.total,
