@@ -419,10 +419,7 @@ export class ChatWsGateway
           id: item.id,
           type: item.type,
           role: currentMember?.role ?? ConversationMemberRole.USER,
-          identifier: item.identifier,
-          identifierAvatarIndex: 0,
-          identifierAvatar: undefined,
-          identifierIsDmEnabled: false,
+          identifier: item.identifier ?? '',
           memberCount: item.members.length,
           lastMessage: null,
           notSeenCount: item?.notSeenCount ?? 0,
@@ -431,15 +428,18 @@ export class ChatWsGateway
         if (isDirect && otherMember) {
           const otherUser = usersById.get(otherMember.userId);
           if (otherUser) {
-            conversation.identifier = otherUser.username;
-            conversation.identifierAvatarIndex = otherUser.avatarIndex;
-            conversation.identifierAvatar = otherUser.avatar;
-            conversation.identifierIsDmEnabled = otherUser.isDmEnabled;
+            conversation.identifier = {
+              id: otherUser.id,
+              username: otherUser.username,
+              avatarIndex: otherUser.avatarIndex,
+              avatar: otherUser.avatar,
+              isDmEnabled: otherUser.isDmEnabled,
+              pawnId: otherUser.pawnId,
+              netWorth: otherUser.netWorth,
+            };
           }
         } else if (!isDirect) {
           conversation.identifier = item.title ?? item.identifier ?? '';
-          conversation.identifierAvatar =
-            this.fileStorage.getGroupPictureUrl(item.picture) ?? undefined;
         }
 
         if (item.lastMessage) {

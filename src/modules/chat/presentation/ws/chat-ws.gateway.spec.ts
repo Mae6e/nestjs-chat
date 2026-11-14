@@ -202,6 +202,9 @@ describe('ChatWsGateway', () => {
           firstName: 'Jane',
           lastName: 'Smith',
           username: 'janes',
+          avatarIndex: 2,
+          avatar: 'janes.png',
+          isDmEnabled: true,
         },
       ] as any);
 
@@ -210,7 +213,13 @@ describe('ChatWsGateway', () => {
         'user-1',
       );
       expect(result.data[0].id).toBe('conv-1');
-      expect(result.data[0].identifier).toBe('janes');
+      expect(result.data[0].identifier).toEqual({
+        id: 'user-2',
+        username: 'janes',
+        avatarIndex: 2,
+        avatar: 'janes.png',
+        isDmEnabled: true,
+      });
 
       const query = queryBus.execute.mock
         .calls[0][0] as GetUserConversationListQuery;

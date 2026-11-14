@@ -4,6 +4,8 @@ export interface ChatUser {
   avatarIndex: number;
   avatar?: string;
   isDmEnabled: boolean;
+  pawnId?: number;
+  netWorth?: number;
 }
 
 export interface BlockStatus {

@@ -49,14 +49,22 @@ export class UserConversationListItemMessage {
   user: UserConversationListItemMessageUser;
 }
 
+export class UserConversationListIdentifier {
+  id: string;
+  username: string;
+  avatarIndex: number;
+  avatar?: string;
+  isDmEnabled: boolean;
+  pawnId: number;
+  netWorth: number;
+}
+
 export class UserConversationListItem {
   id: string;
   type: ConversationType;
   role: ConversationMemberRole;
-  identifier: string;
-  identifierAvatarIndex: number;
-  identifierAvatar?: string;
-  identifierIsDmEnabled: boolean;
+  /** Group conversations use the group title; direct conversations use the other user. */
+  identifier: string | UserConversationListIdentifier;
   memberCount: number;
   notSeenCount: number;
   lastMessage: UserConversationListItemMessage;
