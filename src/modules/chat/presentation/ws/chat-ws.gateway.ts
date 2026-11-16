@@ -247,6 +247,13 @@ export class ChatWsGateway
         code: 'CHAT_BLOCKED_USER',
       });
     }
+    if (blockStatus.isBlocked) {
+      throw new WsException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'You are blocked by this user.',
+        code: 'CHAT_BLOCKED_BY_USER',
+      });
+    }
 
     const createConversation = await this.commandBus.execute(
       new CreateDirectConversationCommand(currentUser.id, data.targetUserId),
@@ -260,7 +267,7 @@ export class ChatWsGateway
           MessageType.TEXT,
           currentUser.id,
           createConversation.id,
-          blockStatus.isBlocked ? [targetUser.id] : [],
+          [],
         ),
       );
     } catch (e) {
@@ -487,7 +494,7 @@ export class ChatWsGateway
 
     let currentUser: ChatUser;
     let targetUser: ChatUser | undefined;
-    let deletedForUserIds: string[] = [];
+    const deletedForUserIds: string[] = [];
 
     if (isDirect) {
       const targetMember = conversation.members.find(
@@ -544,7 +551,13 @@ export class ChatWsGateway
         });
       }
 
-      deletedForUserIds = blockStatus.isBlocked ? [targetUser.id] : [];
+      if (blockStatus.isBlocked) {
+        throw new WsException({
+          statusCode: HttpStatus.FORBIDDEN,
+          message: 'You are blocked by this user.',
+          code: 'CHAT_BLOCKED_BY_USER',
+        });
+      }
     } else {
       const users = await this.userIntegrationPort.getUsersByIds([authUserId]);
       currentUser = users.find((u) => u.id === authUserId);

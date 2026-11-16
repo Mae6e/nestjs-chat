@@ -104,6 +104,32 @@ describe('ChatWsGateway', () => {
       ).rejects.toThrow(WsException);
     });
 
+    it('should throw CHAT_BLOCKED_BY_USER if current user is blocked by the target', async () => {
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1', isDmEnabled: true },
+        { id: 'user-2', isDmEnabled: true },
+      ] as any);
+      userIntegrationPort.getBlockStatus.mockResolvedValue({
+        isBlocker: false,
+        isBlocked: true,
+      });
+
+      try {
+        await gateway.createDirectConversation(
+          {} as any,
+          { targetUserId: 'user-2', content: 'hello' },
+          'user-1',
+        );
+        throw new Error('Expected createDirectConversation to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(WsException);
+        expect((error as WsException).getError()).toMatchObject({
+          statusCode: 403,
+          code: 'CHAT_BLOCKED_BY_USER',
+        });
+      }
+    });
+
     it('should create conversation, broadcast, and return result', async () => {
       userIntegrationPort.getUsersByIds.mockResolvedValue([
         {
@@ -310,6 +336,37 @@ describe('ChatWsGateway', () => {
           'user-1',
         ),
       ).rejects.toThrow(WsException);
+    });
+
+    it('should throw CHAT_BLOCKED_BY_USER if current user is blocked by the target', async () => {
+      queryBus.execute.mockResolvedValue({
+        id: 'conv-1',
+        type: ConversationType.DIRECT,
+        members: [{ userId: 'user-1' }, { userId: 'user-2' }],
+      });
+      userIntegrationPort.getUsersByIds.mockResolvedValue([
+        { id: 'user-1', isDmEnabled: true },
+        { id: 'user-2', isDmEnabled: true },
+      ] as any);
+      userIntegrationPort.getBlockStatus.mockResolvedValue({
+        isBlocker: false,
+        isBlocked: true,
+      });
+
+      try {
+        await gateway.createMessage(
+          {} as any,
+          { conversationId: 'conv-1', text: 'hi' },
+          'user-1',
+        );
+        throw new Error('Expected createMessage to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(WsException);
+        expect((error as WsException).getError()).toMatchObject({
+          statusCode: 403,
+          code: 'CHAT_BLOCKED_BY_USER',
+        });
+      }
     });
 
     it('should create message', async () => {
