@@ -673,12 +673,7 @@ export class ChatWsGateway
             content: item.text,
             createdAt: item.createdAt,
             seen,
-            user: user
-              ? {
-                  id: user.id,
-                  username: user.username,
-                }
-              : null,
+            userId: user ? user.id : null,
           };
 
           return message;
