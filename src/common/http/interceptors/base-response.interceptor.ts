@@ -33,7 +33,7 @@ function isPaginatedPayload(value: unknown): value is PaginatedPayload {
 
 /**
  * Wraps every successful HTTP controller response in a consistent
- * `{ data, message }` envelope. Paginated payloads (`{ data, meta }`) are
+ * `{ succeed, data, message }` envelope. Paginated payloads (`{ data, meta }`) are
  * flattened so the response keeps a single top-level `data` array:
  * `{ data: [...], meta, message }`.
  */
@@ -58,6 +58,7 @@ export class BaseResponseInterceptor<T> implements NestInterceptor<
       map((payload) => {
         if (isPaginatedPayload(payload)) {
           return {
+            succeed: true,
             data: payload.data,
             meta: payload.meta,
             message,
@@ -65,6 +66,7 @@ export class BaseResponseInterceptor<T> implements NestInterceptor<
         }
 
         return {
+          succeed: true,
           data: payload ?? null,
           message,
         };

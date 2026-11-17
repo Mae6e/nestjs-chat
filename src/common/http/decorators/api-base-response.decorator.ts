@@ -30,6 +30,10 @@ export function ApiBaseResponse<T>(
     schema: {
       type: 'object' as const,
       properties: {
+        succeed: {
+          type: 'boolean' as const,
+          example: true,
+        },
         message: {
           type: 'string' as const,
           example: 'Success',

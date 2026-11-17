@@ -24,6 +24,7 @@ describe('GlobalHttpExceptionFilter', () => {
     expect(reply).toHaveBeenCalledWith(
       response,
       {
+        succeed: false,
         data: null,
         statusCode: 404,
         message: 'Conversation not found',
@@ -39,6 +40,7 @@ describe('GlobalHttpExceptionFilter', () => {
     expect(reply).toHaveBeenCalledWith(
       response,
       {
+        succeed: false,
         statusCode: 409,
         message: 'Already exists',
         code: 'Conflict',

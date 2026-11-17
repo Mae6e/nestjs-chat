@@ -37,6 +37,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       return httpAdapter.reply(
         ctx.getResponse(),
         {
+          succeed: false,
           data: null,
           statusCode: httpStatus,
           message: message,
@@ -59,6 +60,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       return httpAdapter.reply(
         ctx.getResponse(),
         {
+          succeed: false,
           statusCode: exception.getStatus(),
           ...responseBody,
           ...(responseCode !== undefined ? { code: responseCode } : {}),
@@ -77,6 +79,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     httpAdapter.reply(
       ctx.getResponse(),
       {
+        succeed: false,
         data: null,
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Internal server error',

@@ -34,6 +34,7 @@ describe('BaseResponseInterceptor', () => {
     );
 
     expect(result).toEqual({
+      succeed: true,
       data: { id: 'group-1' },
       message: 'Group created successfully',
     });
@@ -47,6 +48,7 @@ describe('BaseResponseInterceptor', () => {
     );
 
     expect(result).toEqual({
+      succeed: true,
       data: { id: 'group-1' },
       message: 'Success',
     });
@@ -64,6 +66,7 @@ describe('BaseResponseInterceptor', () => {
     );
 
     expect(result).toEqual({
+      succeed: true,
       data: payload.data,
       meta: payload.meta,
       message: 'Groups retrieved successfully',
@@ -78,6 +81,7 @@ describe('BaseResponseInterceptor', () => {
     );
 
     expect(result).toEqual({
+      succeed: true,
       data: null,
       message: 'Success',
     });

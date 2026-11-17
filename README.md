@@ -299,10 +299,11 @@ Group `picture` values are returned as public URLs such as `/uploads/group-pictu
 
 ### HTTP Response Format
 
-Successful HTTP responses use a common `{ data, message }` envelope:
+Successful HTTP responses use a common `{ succeed, data, message }` envelope, where `succeed` is always `true`:
 
 ```json
 {
+  "succeed": true,
   "data": {
     "id": "0199c0f4-...",
     "title": "Team"
@@ -315,6 +316,7 @@ Paginated responses add `meta` alongside the items:
 
 ```json
 {
+  "succeed": true,
   "data": [],
   "meta": {
     "page": 1,
@@ -328,10 +330,11 @@ Paginated responses add `meta` alongside the items:
 }
 ```
 
-Error responses use `data: null` and keep the HTTP status code and message:
+Error responses use `succeed: false` and `data: null`, and keep the HTTP status code and message:
 
 ```json
 {
+  "succeed": false,
   "data": null,
   "statusCode": 409,
   "message": "User is already blocked",
