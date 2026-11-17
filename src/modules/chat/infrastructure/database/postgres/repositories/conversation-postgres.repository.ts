@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { DatabaseType } from '@infrastructure/database/database-type.enum';
 import { Message } from '@modules/chat/infrastructure/database/postgres/entities/message.entity';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
@@ -13,6 +13,18 @@ import { DeletedMessage } from '@modules/chat/infrastructure/database/postgres/e
 import { UserBlock } from '@modules/chat/infrastructure/database/postgres/entities/user-block.entity';
 import { ConversationMemberStatus } from '@modules/chat/domain/enums/conversation-member-status.enum';
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
+
+const POSTGRES_UNIQUE_VIOLATION = '23505';
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof QueryFailedError)) {
+    return false;
+  }
+
+  const driverError = error.driverError as { code?: string } | undefined;
+
+  return driverError?.code === POSTGRES_UNIQUE_VIOLATION;
+}
 
 @Injectable()
 export class ConversationPostgresRepository implements ConversationRepositoryPort {
@@ -283,21 +295,44 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
 
   async block(blockerId: string, blockedId: string): Promise<boolean> {
     return this.dataSource.transaction(async (entityManager) => {
-      const status = await entityManager
-        .getRepository(UserBlock)
+      const userBlockRepository = entityManager.getRepository(UserBlock);
+
+      // Unblocking soft-deletes the row, but the composite primary key
+      // (blocker_id, blocked_id) still holds it. Look at deleted rows too so a
+      // re-block revives the existing row instead of inserting a duplicate.
+      const existingBlock = await userBlockRepository
         .createQueryBuilder('ub')
+        .withDeleted()
         .where('blocker_id = :blockerId', { blockerId })
         .andWhere('blocked_id = :blockedId', { blockedId })
-        .getExists();
-      if (status == true) {
+        .getOne();
+
+      if (existingBlock && existingBlock.deleted_at === null) {
         return false;
+      }
+
+      if (existingBlock) {
+        await userBlockRepository.restore({
+          blocker_id: blockerId,
+          blocked_id: blockedId,
+        });
+        return true;
       }
 
       const userBlock = new UserBlock();
       userBlock.blocker_id = blockerId;
       userBlock.blocked_id = blockedId;
 
-      await entityManager.getRepository(UserBlock).insert(userBlock);
+      try {
+        await userBlockRepository.insert(userBlock);
+      } catch (error) {
+        // Two concurrent block requests can both pass the existence check;
+        // the loser hits the primary key constraint and is already blocked.
+        if (isUniqueViolation(error)) {
+          return false;
+        }
+        throw error;
+      }
 
       return true;
     });

@@ -3,7 +3,6 @@ import { BlockUserHandler } from './block-user.handler';
 import { ConversationRepositoryPort } from '@modules/chat/application/ports/conversation-repository.port';
 import { EventPublisher } from '@nestjs/cqrs';
 import { BlockUserCommand } from './block-user.command';
-import { UserNotFoundException } from '@modules/chat/domain/chat.exceptions';
 
 describe('BlockUserHandler', () => {
   let handler: BlockUserHandler;
@@ -37,6 +36,29 @@ describe('BlockUserHandler', () => {
   });
 
   //todo user block test
+
+  it('should return false when the user is already blocked', async () => {
+    commandRepo.getBlockStatus.mockResolvedValue(true);
+
+    const result = await handler.execute(
+      new BlockUserCommand('blocker-1', 'blocked-1'),
+    );
+
+    expect(result).toBe(false);
+    expect(commandRepo.block).not.toHaveBeenCalled();
+  });
+
+  it('should block the user and return true', async () => {
+    commandRepo.getBlockStatus.mockResolvedValue(false);
+    commandRepo.block.mockResolvedValue(true);
+
+    const result = await handler.execute(
+      new BlockUserCommand('blocker-1', 'blocked-1'),
+    );
+
+    expect(result).toBe(true);
+    expect(commandRepo.block).toHaveBeenCalledWith('blocker-1', 'blocked-1');
+  });
 
   // it('should throw UserNotFoundException if blocker is not found', async () => {
   //   commandRepo.getUserById.mockResolvedValueOnce(null);

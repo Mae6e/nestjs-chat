@@ -7,6 +7,7 @@ import { ConversationEntity } from '@modules/chat/domain/models/conversation.mod
 import { ConversationType } from '@modules/chat/domain/enums/conversation-type.enum';
 import { MessageEntity } from '@modules/chat/domain/models/message.model';
 import { MessageType } from '@modules/chat/domain/enums/chat-type.enum';
+import { QueryFailedError } from 'typeorm';
 
 describe('ConversationPostgresRepository', () => {
   let repository: ConversationPostgresRepository;
@@ -24,9 +25,11 @@ describe('ConversationPostgresRepository', () => {
       whereInIds: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
+      withDeleted: jest.fn().mockReturnThis(),
       getMany: jest.fn(),
       getRawMany: jest.fn(),
       getExists: jest.fn(),
+      getOne: jest.fn(),
       softDelete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       execute: jest.fn(),
@@ -34,6 +37,8 @@ describe('ConversationPostgresRepository', () => {
 
     repoMock = {
       findOne: jest.fn(),
+      insert: jest.fn(),
+      restore: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
     };
 
@@ -214,16 +219,47 @@ describe('ConversationPostgresRepository', () => {
 
   describe('block', () => {
     it('should return false if already blocked', async () => {
-      queryBuilderMock.getExists.mockResolvedValue(true);
+      queryBuilderMock.getOne.mockResolvedValue({
+        blocker_id: 'blocker',
+        blocked_id: 'blocked',
+        deleted_at: null,
+      });
       const result = await repository.block('blocker', 'blocked');
       expect(result).toBe(false);
+      expect(repoMock.insert).not.toHaveBeenCalled();
+    });
+
+    it('should restore a soft-deleted block and return true', async () => {
+      queryBuilderMock.getOne.mockResolvedValue({
+        blocker_id: 'blocker',
+        blocked_id: 'blocked',
+        deleted_at: new Date(),
+      });
+      const result = await repository.block('blocker', 'blocked');
+      expect(repoMock.restore).toHaveBeenCalledWith({
+        blocker_id: 'blocker',
+        blocked_id: 'blocked',
+      });
+      expect(repoMock.insert).not.toHaveBeenCalled();
+      expect(result).toBe(true);
     });
 
     it('should insert block and return true if not blocked', async () => {
-      queryBuilderMock.getExists.mockResolvedValue(false);
+      queryBuilderMock.getOne.mockResolvedValue(null);
       const result = await repository.block('blocker', 'blocked');
       expect(repoMock.insert).toHaveBeenCalled();
       expect(result).toBe(true);
+    });
+
+    it('should return false when a concurrent insert hits the unique constraint', async () => {
+      queryBuilderMock.getOne.mockResolvedValue(null);
+      repoMock.insert.mockRejectedValue(
+        new QueryFailedError('INSERT', [], { code: '23505' } as any),
+      );
+
+      const result = await repository.block('blocker', 'blocked');
+
+      expect(result).toBe(false);
     });
   });
 
