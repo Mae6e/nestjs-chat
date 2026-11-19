@@ -13,6 +13,7 @@ import { LeaveGroupCommand } from '@modules/chat/application/commands/leave-grou
 import { GetUserConversationListQuery } from '@modules/chat/application/queries/get-user-conversation-list/get-user-conversation-list.query';
 import { GetUserConversationQuery } from '@modules/chat/application/queries/get-user-conversation/get-user-conversation.query';
 import { GetUserConversationMessageListQuery } from '@modules/chat/application/queries/get-user-conversation-message-list/get-user-conversation-message-list.query';
+import { HasUnreadMessagesQuery } from '@modules/chat/application/queries/has-unread-messages/has-unread-messages.query';
 import { GetGroupMembersQuery } from '@modules/chat/application/queries/get-group-members/get-group-members.query';
 import { GetGroupJoinRequestsQuery } from '@modules/chat/application/queries/get-group-join-requests/get-group-join-requests.query';
 import { GetUserConversationIdsQuery } from '@modules/chat/application/queries/get-user-conversation-ids/get-user-conversation-ids.query';
@@ -693,6 +694,17 @@ export class ChatWsGateway
         }),
       },
     };
+  }
+
+  @SubscribeMessage('conversation.unread.has')
+  async hasUnreadMessages(
+    @CurrentUserId() authUserId: string,
+  ): Promise<{ hasUnread: boolean }> {
+    const hasUnread = await this.queryBus.execute(
+      new HasUnreadMessagesQuery(authUserId),
+    );
+
+    return { hasUnread };
   }
 
   @SubscribeMessage('conversation.message.markSeen')

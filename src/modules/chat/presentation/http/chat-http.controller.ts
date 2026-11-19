@@ -77,6 +77,8 @@ import {
 } from '@modules/chat/presentation/http/dtos/report.dto';
 import { ReportDirectMessageCommand } from '@modules/chat/application/commands/report-direct-message/report-direct-message.command';
 import { ReportEntity } from '@modules/chat/domain/models/report.model';
+import { HasUnreadMessagesQuery } from '@modules/chat/application/queries/has-unread-messages/has-unread-messages.query';
+import { HasUnreadMessagesResponse } from '@modules/chat/presentation/http/dtos/unread.dto';
 
 const MAX_GROUP_PICTURE_SIZE = 1 * 1024 * 1024;
 
@@ -144,6 +146,27 @@ export class ChatHttpController {
     )) as MyGroupConversationListResponseDto;
 
     return this.mapMyGroupConversationListResponse(result);
+  }
+
+  @ApiOperation({
+    summary: 'Check unread messages',
+    description:
+      'Returns whether the current user has any unread message in any active direct or group conversation. Intended for badge/notification polling; it uses an `EXISTS` query and does not return counts.',
+  })
+  @ApiBaseResponse(HasUnreadMessagesResponse, {
+    description: 'Unread status retrieved successfully',
+  })
+  @ResponseMessage('Unread status retrieved successfully')
+  @Get('unread')
+  @UseGuards(ChatHttpGuard)
+  async hasUnreadMessages(
+    @CurrentUserId() authUserId: string,
+  ): Promise<HasUnreadMessagesResponse> {
+    const hasUnread = await this.queryBus.execute(
+      new HasUnreadMessagesQuery(authUserId),
+    );
+
+    return { hasUnread };
   }
 
   // @ApiOperation({

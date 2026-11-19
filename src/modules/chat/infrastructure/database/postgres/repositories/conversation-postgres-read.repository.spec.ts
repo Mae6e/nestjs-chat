@@ -541,4 +541,26 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result).toEqual(['user-2']);
     });
   });
+
+  describe('hasUnreadMessages', () => {
+    it('should return true when an unread message exists', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(true);
+
+      const result = await repository.hasUnreadMessages('user-1');
+
+      expect(result).toBe(true);
+      expect(queryBuilderMock.innerJoin).toHaveBeenCalled();
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        'dm.message_id IS NULL',
+      );
+    });
+
+    it('should return false when every message is read', async () => {
+      queryBuilderMock.getExists.mockResolvedValue(false);
+
+      const result = await repository.hasUnreadMessages('user-1');
+
+      expect(result).toBe(false);
+    });
+  });
 });

@@ -28,6 +28,13 @@ export abstract class ConversationReadRepositoryPort {
     options: GetUserConversationListOptions,
   ): Promise<PaginatedResult<ConversationReadDto>>;
 
+  /**
+   * Returns `true` when the user has at least one unread message in any of
+   * their active conversations. Uses an `EXISTS` query so it stops at the
+   * first unread row.
+   */
+  abstract hasUnreadMessages(userId: string): Promise<boolean>;
+
   abstract getUserGroupConversationList(
     userId: string,
     pagination: PaginationOptions,

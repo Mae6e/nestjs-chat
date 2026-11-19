@@ -19,7 +19,7 @@ export class GetGroupConversationListQueryDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ default: 15, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({ default: 25, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

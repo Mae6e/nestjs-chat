@@ -573,6 +573,24 @@ describe('ChatWsGateway', () => {
     });
   });
 
+  describe('hasUnreadMessages', () => {
+    it('should return the unread flag from the query bus', async () => {
+      queryBus.execute.mockResolvedValue(true);
+
+      const result = await gateway.hasUnreadMessages('user-1');
+
+      expect(result).toEqual({ hasUnread: true });
+    });
+
+    it('should return false when there are no unread messages', async () => {
+      queryBus.execute.mockResolvedValue(false);
+
+      const result = await gateway.hasUnreadMessages('user-1');
+
+      expect(result).toEqual({ hasUnread: false });
+    });
+  });
+
   describe('markMessageAsSeen', () => {
     it('should throw if not a member', async () => {
       queryBus.execute.mockResolvedValue({

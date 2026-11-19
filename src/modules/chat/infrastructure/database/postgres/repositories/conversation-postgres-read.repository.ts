@@ -67,6 +67,34 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
     return res;
   }
 
+  /**
+   * Cheap "is there anything unread?" check for badge/notification polling.
+   * `getExists()` renders `SELECT 1 ... WHERE EXISTS (...) LIMIT 1`, so it
+   * stops at the first unread message instead of counting every conversation.
+   */
+  async hasUnreadMessages(userId: string): Promise<boolean> {
+    return this.conversationMemberRepository
+      .createQueryBuilder('cm')
+      .innerJoin(
+        Message,
+        'm',
+        'm.conversation_id = cm.conversation_id ' +
+          'AND m.deleted_at IS NULL ' +
+          'AND (cm.last_seen_message_id IS NULL OR m.id > cm.last_seen_message_id)',
+      )
+      .leftJoin(
+        DeletedMessage,
+        'dm',
+        'dm.message_id = m.id AND dm.user_id = cm.user_id',
+      )
+      .where('cm.user_id = :userId', { userId })
+      .andWhere('cm.status = :status', {
+        status: ConversationMemberStatus.ACTIVE,
+      })
+      .andWhere('dm.message_id IS NULL')
+      .getExists();
+  }
+
   async getUserConversationList(
     userId: string,
     options: GetUserConversationListOptions,

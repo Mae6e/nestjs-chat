@@ -8,6 +8,7 @@ import { GetGroupMembersHandler } from './get-group-members/get-group-members.ha
 import { GetGroupJoinRequestsHandler } from './get-group-join-requests/get-group-join-requests.handler';
 import { GetUserGroupConversationListHandler } from './get-user-group-conversation-list/get-user-group-conversation-list.handler';
 import { GetDirectMessageUserIdsHandler } from './get-direct-message-user-ids/get-direct-message-user-ids.handler';
+import { HasUnreadMessagesHandler } from './has-unread-messages/has-unread-messages.handler';
 
 export const QueryHandlers = [
   GetUserConversationListHandler,
@@ -20,4 +21,5 @@ export const QueryHandlers = [
   GetBlockedUsersIdsHandler,
   GetGroupMembersHandler,
   GetGroupJoinRequestsHandler,
+  HasUnreadMessagesHandler,
 ];

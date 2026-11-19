@@ -9,7 +9,7 @@ export class PaginationHelper {
     let parsedPageSize = Number(pageSize);
 
     if (isNaN(parsedPage)) parsedPage = 1;
-    if (isNaN(parsedPageSize)) parsedPageSize = 15;
+    if (isNaN(parsedPageSize)) parsedPageSize = 25;
 
     const sanitizedPage = Math.max(1, Math.floor(parsedPage));
     const sanitizedPageSize = Math.min(
