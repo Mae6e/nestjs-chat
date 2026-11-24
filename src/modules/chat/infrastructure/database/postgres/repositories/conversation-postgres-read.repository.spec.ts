@@ -160,6 +160,58 @@ describe('ConversationPostgresReadRepository', () => {
       expect(result.data[0].notSeenCount).toBe(1);
     });
 
+    it('should expose the last seen message of the other members', async () => {
+      const convDate = new Date('2026-01-01T09:00:00.000Z');
+      const seenDate = new Date('2026-01-01T10:05:00.000Z');
+      queryBuilderMock.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'conv-1',
+            type: ConversationType.DIRECT,
+            created_at: convDate,
+            updated_at: convDate,
+            conversationMembers: [
+              {
+                id: 'cm-1',
+                user_id: 'user-1',
+                role: ConversationMemberRole.USER,
+                status: ConversationMemberStatus.ACTIVE,
+              },
+            ],
+          },
+        ],
+        1,
+      ]);
+      queryBuilderMock.getRawMany.mockResolvedValue([]);
+      queryBuilderMock.getMany.mockResolvedValue([
+        {
+          id: 'cm-2',
+          conversation_id: 'conv-1',
+          user_id: 'user-2',
+          role: ConversationMemberRole.USER,
+          status: ConversationMemberStatus.ACTIVE,
+          last_seen_message_id: 'msg-2',
+          lastSeenMessage: { id: 'msg-2', created_at: seenDate },
+        },
+      ]);
+
+      const result = await repository.getUserConversationList('user-1', {
+        pagination: { page: 1, pageSize: 10, limit: 10, offset: 0 },
+      });
+
+      const otherMember = result.data[0].members.find(
+        (member) => member.userId === 'user-2',
+      );
+      expect(queryBuilderMock.leftJoinAndSelect).toHaveBeenCalledWith(
+        'cm.lastSeenMessage',
+        expect.any(String),
+      );
+      expect(otherMember?.lastSeenMessageId).toBe('msg-2');
+      expect(otherMember?.lastSeenMessage?.createdAt).toBe(
+        seenDate.toISOString(),
+      );
+    });
+
     it('should match conversations by user filter or title search', async () => {
       queryBuilderMock.getManyAndCount.mockResolvedValue([[], 0]);
 

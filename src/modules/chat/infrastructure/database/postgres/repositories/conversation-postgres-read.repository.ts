@@ -198,9 +198,11 @@ export class ConversationPostgresReadRepository implements ConversationReadRepos
       };
     });
 
-    // Populate all active members (direct has one other, group may have many)
+    // Populate all active members (direct has one other, group may have many).
+    // Their last seen message is needed to resolve `lastMessage.seen`.
     const allMembers = await this.conversationMemberRepository
       .createQueryBuilder('cm')
+      .leftJoinAndSelect('cm.lastSeenMessage', 'otherLastSeenMessage')
       .where('cm.conversation_id IN (:...conversationIds)', { conversationIds })
       .andWhere('cm.status = :active', {
         active: ConversationMemberStatus.ACTIVE,

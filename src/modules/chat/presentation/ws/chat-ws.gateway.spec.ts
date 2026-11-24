@@ -311,6 +311,112 @@ describe('ChatWsGateway', () => {
         .calls[0][0] as GetUserConversationListQuery;
       expect(query.options.titleSearch).toBe('jan');
     });
+
+    describe('lastMessage.seen', () => {
+      const messageCreatedAt = '2026-01-01T10:00:00.000Z';
+      const seenAt = '2026-01-01T10:05:00.000Z';
+
+      const mockConversation = (
+        type: ConversationType,
+        senderId: string,
+        members: Array<{ userId: string; lastSeenAt: string | null }>,
+      ) => {
+        queryBus.execute.mockResolvedValue({
+          meta: { total: 1, page: 1, pageSize: 10 },
+          data: [
+            {
+              id: 'conv-1',
+              type,
+              title: 'Team',
+              members: members.map((member) => ({
+                userId: member.userId,
+                lastSeenMessage: member.lastSeenAt
+                  ? { createdAt: member.lastSeenAt }
+                  : null,
+              })),
+              lastMessage: {
+                id: 'msg-1',
+                senderId,
+                text: 'hi',
+                createdAt: messageCreatedAt,
+              },
+            },
+          ],
+        });
+      };
+
+      const getSeen = async (type?: ConversationType) => {
+        const result = await gateway.getUserConversationList(
+          { page: 1, pageSize: 10, targetUserId: 'other', type } as any,
+          'user-1',
+        );
+        return result.data[0].lastMessage.seen;
+      };
+
+      beforeEach(() => {
+        userIntegrationPort.getUsersByIds.mockResolvedValue([
+          { id: 'user-1', username: 'john' },
+          { id: 'user-2', username: 'jane' },
+          { id: 'user-3', username: 'jack' },
+        ] as any);
+      });
+
+      it('should be false when I sent the last message and the other side has not seen it', async () => {
+        mockConversation(ConversationType.DIRECT, 'user-1', [
+          { userId: 'user-1', lastSeenAt: null },
+          { userId: 'user-2', lastSeenAt: null },
+        ]);
+
+        await expect(getSeen()).resolves.toBe(false);
+      });
+
+      it('should be true when I sent the last message and the other side has seen it', async () => {
+        mockConversation(ConversationType.DIRECT, 'user-1', [
+          { userId: 'user-1', lastSeenAt: null },
+          { userId: 'user-2', lastSeenAt: seenAt },
+        ]);
+
+        await expect(getSeen()).resolves.toBe(true);
+      });
+
+      it('should be false when the other side sent the last message and I have not seen it', async () => {
+        mockConversation(ConversationType.DIRECT, 'user-2', [
+          { userId: 'user-1', lastSeenAt: null },
+          { userId: 'user-2', lastSeenAt: null },
+        ]);
+
+        await expect(getSeen()).resolves.toBe(false);
+      });
+
+      it('should be true when the other side sent the last message and I have seen it', async () => {
+        mockConversation(ConversationType.DIRECT, 'user-2', [
+          { userId: 'user-1', lastSeenAt: seenAt },
+          { userId: 'user-2', lastSeenAt: null },
+        ]);
+
+        await expect(getSeen()).resolves.toBe(true);
+      });
+
+      it('should be true in a group when every other member has seen my last message', async () => {
+        mockConversation(ConversationType.GROUP, 'user-1', [
+          { userId: 'user-1', lastSeenAt: null },
+          { userId: 'user-2', lastSeenAt: seenAt },
+          { userId: 'user-3', lastSeenAt: seenAt },
+        ]);
+
+        await expect(getSeen(ConversationType.GROUP)).resolves.toBe(true);
+      });
+
+      it('should be false in a group when one other member has not seen my last message', async () => {
+        mockConversation(ConversationType.GROUP, 'user-1', [
+          { userId: 'user-1', lastSeenAt: null },
+          { userId: 'user-2', lastSeenAt: seenAt },
+          { userId: 'user-3', lastSeenAt: null },
+        ]);
+
+        await expect(getSeen(ConversationType.GROUP)).resolves.toBe(false);
+      });
+    });
   });
 
   describe('createMessage', () => {
