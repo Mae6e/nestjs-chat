@@ -12,6 +12,7 @@ import { CommandHandlers } from './application/commands';
 import { QueryHandlers } from './application/queries';
 import { EventHandlers } from './presentation/ws/events/handlers';
 import { ChatHttpController } from './presentation/http/chat-http.controller';
+import { ChatReportIntegrationController } from './presentation/http/chat-report-integration.controller';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { authConfig } from '@infrastructure/config/auth.config';
@@ -20,6 +21,10 @@ import { PlatformApiModule } from '@infrastructure/platform-api/platform-api.mod
 import { uploadConfig } from '@infrastructure/upload/upload.config';
 import { FileStoragePort } from './application/ports/file-storage.port';
 import { LocalFileStorageAdapter } from './infrastructure/adapters/local-file-storage.adapter';
+import { ChatIntegrationGuard } from './presentation/http/guards/chat-integration.guard';
+import { IntegrationScopeGuard } from './presentation/http/guards/integration-scope.guard';
+import { ChatIntegrationAuthPort } from './application/ports/chat-integration-auth.port';
+import { ChatIntegrationAuthAdapter } from './infrastructure/adapters/chat-integration-auth.adapter';
 
 @Module({
   imports: [
@@ -50,7 +55,13 @@ import { LocalFileStorageAdapter } from './infrastructure/adapters/local-file-st
     ...QueryHandlers,
     ...EventHandlers,
     ChatHttpGuard,
+    ChatIntegrationGuard,
+    IntegrationScopeGuard,
     { provide: AuthIntegrationPort, useClass: AuthIntegrationAdapter },
+    {
+      provide: ChatIntegrationAuthPort,
+      useClass: ChatIntegrationAuthAdapter,
+    },
     {
       provide: UserIntegrationPort,
       useClass: UserIntegrationAdapter,
@@ -60,7 +71,7 @@ import { LocalFileStorageAdapter } from './infrastructure/adapters/local-file-st
       useClass: LocalFileStorageAdapter,
     },
   ],
-  controllers: [ChatHttpController],
+  controllers: [ChatHttpController, ChatReportIntegrationController],
   exports: [],
 })
 export class ChatModule {}
