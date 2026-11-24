@@ -44,16 +44,16 @@ export class CreateDirectConversationHandler implements ICommandHandler<
       throw new BlockedUserException();
     }
 
-    const conversationExists = await this.queryRepo.conversationExists(
-      userId,
-      targetUserId,
-    );
-    if (conversationExists) {
-      this.logger.log(
-        `User ${userId} already has a direct conversation with ${targetUserId}. returning error.`,
-      );
-      throw new ConversationAlreadyExistsException();
-    }
+    // const conversationExists = await this.queryRepo.conversationExists(
+    //   userId,
+    //   targetUserId,
+    // );
+    // if (conversationExists) {
+    //   this.logger.log(
+    //     `User ${userId} already has a direct conversation with ${targetUserId}. returning error.`,
+    //   );
+    //   throw new ConversationAlreadyExistsException();
+    // }
 
     this.logger.debug(
       `Creating direct conversation for users ${userId} and ${targetUserId}`,

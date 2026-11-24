@@ -15,6 +15,19 @@ describe('ConversationEntity', () => {
     expect(conv.members[1].userId).toBe('u-2');
   });
 
+  it('should use the same direct key regardless of who starts the chat', () => {
+    const aToB = ConversationEntity.createDirect('u-1', 'u-2');
+    const bToA = ConversationEntity.createDirect('u-2', 'u-1');
+
+    expect(aToB.directKey).toBe('u-1:u-2');
+    expect(bToA.directKey).toBe(aToB.directKey);
+  });
+
+  it('should not set a direct key for group conversations', () => {
+    const conv = ConversationEntity.createGroup('u-1', 'Team');
+    expect(conv.directKey).toBeNull();
+  });
+
   it('should reconstruct correctly', () => {
     const date = new Date();
     const conv = ConversationEntity.reconstruct(

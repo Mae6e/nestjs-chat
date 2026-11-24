@@ -112,6 +112,44 @@ describe('ConversationPostgresRepository', () => {
       expect(result).toBeInstanceOf(ConversationEntity);
       expect(result.id).toBe(conv.id);
     });
+
+    it('should persist the deterministic direct key', async () => {
+      const conv = ConversationEntity.createDirect('user-2', 'user-1');
+      entityManagerMock.save.mockImplementation(async (entity) => entity);
+      entityManagerMock.findOne.mockResolvedValue(
+        Conversation.fromDomain(conv),
+      );
+
+      await repository.saveConversation(conv);
+
+      const savedConversation = entityManagerMock.save.mock.calls[0][0];
+      expect(savedConversation.direct_key).toBe('user-1:user-2');
+    });
+
+    it('should return the existing conversation when a concurrent create wins the unique key race', async () => {
+      const conv = ConversationEntity.createDirect('user-1', 'user-2');
+      dataSourceMock.transaction.mockRejectedValueOnce(
+        new QueryFailedError('INSERT', [], { code: '23505' } as any),
+      );
+      const winner = ConversationEntity.createDirect('user-1', 'user-2');
+      repoMock.findOne.mockResolvedValue(Conversation.fromDomain(winner));
+
+      const result = await repository.saveConversation(conv);
+
+      expect(repoMock.findOne).toHaveBeenCalledWith({
+        where: { direct_key: 'user-1:user-2' },
+        relations: { conversationMembers: true },
+      });
+      expect(result.id).toBe(winner.id);
+    });
+
+    it('should rethrow unexpected errors', async () => {
+      const conv = ConversationEntity.createDirect('user-1', 'user-2');
+      dataSourceMock.transaction.mockRejectedValueOnce(new Error('boom'));
+
+      await expect(repository.saveConversation(conv)).rejects.toThrow('boom');
+      expect(repoMock.findOne).not.toHaveBeenCalled();
+    });
   });
 
   describe('saveMessage', () => {

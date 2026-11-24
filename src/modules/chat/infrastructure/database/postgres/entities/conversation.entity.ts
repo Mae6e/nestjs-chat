@@ -31,6 +31,18 @@ export class Conversation {
   @Index('conversations_identifier_uniq', { unique: true })
   identifier: string | null;
 
+  /**
+   * Deterministic key (`smallerUserId:largerUserId`) for DIRECT conversations.
+   * A partial unique index keeps one active conversation per pair; legacy rows
+   * and soft-deleted conversations are excluded.
+   */
+  @Column({ type: 'varchar', length: 49, nullable: true })
+  @Index('conversations_direct_key_uniq', {
+    unique: true,
+    where: `"direct_key" IS NOT NULL AND "deleted_at" IS NULL`,
+  })
+  direct_key: string | null;
+
   @Column({ type: 'char', length: 24, nullable: true })
   created_by: string | null;
 
@@ -71,6 +83,7 @@ export class Conversation {
     conversation.description = entity.description;
     conversation.picture = entity.picture;
     conversation.identifier = entity.identifier;
+    conversation.direct_key = entity.directKey;
     conversation.created_by = entity.createdBy;
     conversation.updated_by = entity.updatedBy;
     conversation.type = entity.type;
@@ -106,6 +119,7 @@ export class Conversation {
       conversation.created_by,
       conversation.updated_by,
       conversation.deleted_at,
+      conversation.direct_key ?? null,
     );
 
     if (conversation.messages) {

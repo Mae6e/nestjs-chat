@@ -15,6 +15,16 @@ export class ConversationEntity extends AggregateRoot<string> {
   private readonly _createdBy: string | null;
   private _updatedBy: string | null;
   private _deletedAt?: Date;
+  private readonly _directKey: string | null;
+
+  /**
+   * Deterministic key for a direct conversation: both user ids sorted and
+   * joined, so A→B and B→A produce the same value. It backs the unique index
+   * that keeps a single conversation per pair.
+   */
+  public static directKeyFor(userId: string, targetUserId: string): string {
+    return [userId, targetUserId].sort().join(':');
+  }
 
   // Domain associations
   private _members: ConversationMemberEntity[] = [];
@@ -123,6 +133,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     createdBy: string | null = null,
     updatedBy: string | null = null,
     deletedAt?: Date,
+    directKey: string | null = null,
   ) {
     super(id, createdAt, updatedAt);
     this._type = type;
@@ -133,6 +144,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     this._createdBy = createdBy;
     this._updatedBy = updatedBy;
     this._deletedAt = deletedAt;
+    this._directKey = directKey;
   }
 
   public static createDirect(
@@ -150,6 +162,9 @@ export class ConversationEntity extends AggregateRoot<string> {
       null,
       uuidv7(),
       userId,
+      undefined,
+      undefined,
+      ConversationEntity.directKeyFor(userId, targetUserId),
     );
 
     conversation.addMember(
@@ -232,6 +247,7 @@ export class ConversationEntity extends AggregateRoot<string> {
     createdBy: string | null = null,
     updatedBy: string | null = null,
     deletedAt?: Date,
+    directKey: string | null = null,
   ): ConversationEntity {
     return new ConversationEntity(
       id,
@@ -245,6 +261,7 @@ export class ConversationEntity extends AggregateRoot<string> {
       createdBy,
       updatedBy,
       deletedAt,
+      directKey,
     );
   }
 
@@ -262,6 +279,9 @@ export class ConversationEntity extends AggregateRoot<string> {
   }
   public get identifier(): string | null {
     return this._identifier;
+  }
+  public get directKey(): string | null {
+    return this._directKey;
   }
   public get createdBy(): string | null {
     return this._createdBy;

@@ -51,6 +51,28 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
   async saveConversation(
     conversationEntity: ConversationEntity,
   ): Promise<ConversationEntity> {
+    try {
+      return await this.persistConversation(conversationEntity);
+    } catch (error) {
+      // Two concurrent `conversation.create` calls can both pass the "already
+      // exists" check. The deterministic `direct_key` makes the loser hit the
+      // unique index, so return the conversation that won instead of failing
+      // (or creating a duplicate).
+      if (isUniqueViolation(error) && conversationEntity.directKey) {
+        const existing = await this.findDirectConversationByKey(
+          conversationEntity.directKey,
+        );
+        if (existing) {
+          return existing;
+        }
+      }
+      throw error;
+    }
+  }
+
+  private async persistConversation(
+    conversationEntity: ConversationEntity,
+  ): Promise<ConversationEntity> {
     const res = await this.dataSource.transaction(async (entityManager) => {
       // Save Conversation
       const conversationToSave = Conversation.fromDomain(conversationEntity);
@@ -74,6 +96,19 @@ export class ConversationPostgresRepository implements ConversationRepositoryPor
     });
 
     return Conversation.toDomain(res);
+  }
+
+  private async findDirectConversationByKey(
+    directKey: string,
+  ): Promise<ConversationEntity | null> {
+    const conversation = await this.dataSource
+      .getRepository(Conversation)
+      .findOne({
+        where: { direct_key: directKey },
+        relations: { conversationMembers: true },
+      });
+
+    return conversation ? Conversation.toDomain(conversation) : null;
   }
 
   async saveMessage(messageEntity: MessageEntity): Promise<MessageEntity> {
