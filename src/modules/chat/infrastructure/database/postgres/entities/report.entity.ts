@@ -12,6 +12,12 @@ import { ReportStatus } from '@modules/chat/domain/enums/report-status.enum';
 import { ReportEntity } from '@modules/chat/domain/models/report.model';
 
 @Entity({ schema: 'chat', name: 'reports' })
+@Index('reports_type_status_created_at_id_idx', [
+  'type',
+  'status',
+  'created_at',
+  'id',
+])
 export class Report {
   @PrimaryColumn('uuid')
   id: string;

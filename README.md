@@ -295,8 +295,18 @@ All HTTP endpoints are prefixed and documented via OpenAPI:
 | `PATCH`  | `/v1/chat/group/:conversationId`                     | **(admin)** Update a group (`multipart/form-data`: `title` max 50 chars and/or `picture` file). If no picture is sent, the current picture is removed. Emits `conversation.group.updated` to active members                                                                                                                                                          | Bearer JWT    |
 | `POST`   | `/v1/chat/report/direct-message`                     | Report the other user in a direct conversation. Body: `conversationId` (UUID) and `description` (required, max 500 chars). The target user is derived from the conversation; only one pending report per user/conversation pair is allowed                                                                                                                        | Bearer JWT    |
 | `GET`    | `/v1/chat/unread`                                    | Returns `{ hasUnread: boolean }` indicating whether the current user has at least one unread message in any active direct or group conversation. Uses an `EXISTS` query, so it is cheap to poll for badges/notifications                                                                              | Bearer JWT    |
+| `GET`    | `/v1/chat/integration/reports?page=1&pageSize=25&status=PENDING` | **(service integration)** Paginated direct-conversation report queue. Status can be `PENDING`, `REVIEWED`, `RESOLVED`, or `REJECTED`, and defaults to `PENDING`                                                                                                                                 | Service JWT   |
+| `GET`    | `/v1/chat/integration/reports/:reportId/messages?page=1&pageSize=25` | **(service integration)** Paginated message history for the conversation attached to a report, newest first                                                                                                                                                                              | Service JWT   |
 
 Group `picture` values are returned as public URLs such as `/uploads/group-pictures/<file-name>`. The database stores only the uploaded file name; legacy rows containing a full public path are still returned and cleaned up correctly.
+
+Report integration endpoints require a signed service token with the
+`nestjs-chat-integration` audience, `tokenUse: "service"` (or
+`token_use: "service"`), and the `chat.reports.read` scope. The client service
+identity belongs in `sub`; no human role authorizes these routes. Pagination
+defaults to 25 records and is capped at 100. The report-message endpoint is
+keyed by `reportId`, not an arbitrary conversation ID, so it can only browse a
+conversation that has a report.
 
 ### HTTP Response Format
 
@@ -585,6 +595,9 @@ Configure the following variables in `.env`:
 | `LOG_FILE`                      | String  | `logs/app.log`             | Output path for log files when `LOG_USE_FILE=true`                            |
 | `LOG_LEVEL`                     | String  | `debug`                    | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                    |
 | `AUTH_ACCESS_PUBLIC_KEY_PATH`   | String  | `keys/access_public.key`   | Path to RS256 public key for access tokens                                    |
+| `AUTH_INTEGRATION_PUBLIC_KEY_PATH` | String | value of `AUTH_ACCESS_PUBLIC_KEY_PATH` | Optional path to the RS256 public key used only for service integration tokens |
+| `AUTH_INTEGRATION_TOKEN_ISSUER` | String  | `nestjs-chat`              | Expected issuer for service integration tokens                               |
+| `AUTH_INTEGRATION_TOKEN_AUDIENCE` | String | `nestjs-chat-integration` | Expected audience for service integration tokens                             |
 | `AUTH_ACCESS_PRIVATE_KEY_PATH`  | String  | `keys/access_private.key`  | Path to RS256 private key for access tokens                                   |
 | `AUTH_REFRESH_PUBLIC_KEY_PATH`  | String  | `keys/refresh_public.key`  | Path to RS256 public key for refresh tokens                                   |
 | `AUTH_REFRESH_PRIVATE_KEY_PATH` | String  | `keys/refresh_private.key` | Path to RS256 private key for refresh tokens                                  |

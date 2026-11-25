@@ -3,6 +3,8 @@ import {
   ChatDomainError,
   ConversationAlreadyExistsException,
   ConversationNotFoundException,
+  ReportConversationNotFoundException,
+  ReportNotFoundException,
   TargetUserNotFoundException,
 } from './chat.exceptions';
 
@@ -36,5 +38,19 @@ describe('ChatExceptions', () => {
     const ex = new ConversationAlreadyExistsException();
     expect(ex.message).toBe('Conversation already exists');
     expect(ex.code).toBe('CHAT_CONVERSATION_ALREADY_EXISTS');
+  });
+
+  it('should instantiate ReportNotFoundException correctly', () => {
+    const ex = new ReportNotFoundException();
+    expect(ex.message).toBe('Report not found');
+    expect(ex.code).toBe('CHAT_REPORT_NOT_FOUND');
+    expect(ex.type).toBe('NOT_FOUND');
+  });
+
+  it('should instantiate ReportConversationNotFoundException correctly', () => {
+    const ex = new ReportConversationNotFoundException();
+    expect(ex.message).toBe('Reported conversation not found');
+    expect(ex.code).toBe('CHAT_REPORT_CONVERSATION_NOT_FOUND');
+    expect(ex.type).toBe('NOT_FOUND');
   });
 });

@@ -310,6 +310,28 @@ export class ReportDescriptionRequiredException extends DomainException {
   }
 }
 
+export class ReportNotFoundException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason ? `Report not found: ${reason}` : 'Report not found',
+      'CHAT_REPORT_NOT_FOUND',
+      'NOT_FOUND',
+    );
+  }
+}
+
+export class ReportConversationNotFoundException extends DomainException {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Reported conversation not found: ${reason}`
+        : 'Reported conversation not found',
+      'CHAT_REPORT_CONVERSATION_NOT_FOUND',
+      'NOT_FOUND',
+    );
+  }
+}
+
 export class UserDomainError extends DomainException {
   constructor(message: string) {
     super(message, 'USER_DOMAIN_ERROR', 'BUSINESS_RULE');

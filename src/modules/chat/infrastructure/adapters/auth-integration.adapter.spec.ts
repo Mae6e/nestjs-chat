@@ -1,53 +1,38 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import { AuthIntegrationAdapter } from './auth-integration.adapter';
-import { QueryBus } from '@nestjs/cqrs';
-import { VerifyAccessTokenQuery } from '@modules/auth/application/queries/verify-access-token/verify-access-token.query';
 
 describe('AuthIntegrationAdapter', () => {
+  let jwtService: jest.Mocked<JwtService>;
   let adapter: AuthIntegrationAdapter;
-  let queryBusMock: any;
 
-  beforeEach(async () => {
-    queryBusMock = {
-      execute: jest.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthIntegrationAdapter,
-        { provide: QueryBus, useValue: queryBusMock },
-      ],
-    }).compile();
-
-    adapter = module.get<AuthIntegrationAdapter>(AuthIntegrationAdapter);
+  beforeEach(() => {
+    jwtService = {
+      verifyAsync: jest.fn(),
+    } as unknown as jest.Mocked<JwtService>;
+    adapter = new AuthIntegrationAdapter(jwtService, {
+      accessPublicKey: 'user-public-key',
+      integrationPublicKey: 'integration-public-key',
+      integrationTokenIssuer: 'trusted-issuer',
+      integrationTokenAudience: 'nestjs-chat-integration',
+    });
   });
 
-  it('should be defined', () => {
-    expect(adapter).toBeDefined();
-  });
+  it('verifies and maps an end-user access token', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-1',
+      role: 'USER',
+      exp: 123456789,
+    });
 
-  describe('verifyToken', () => {
-    it('should execute VerifyAccessTokenQuery and return mapped payload', async () => {
-      const mockPayload = {
-        sub: 'user-1',
-        role: 'user',
-        exp: 123456789,
-        iat: 123456,
-        aud: 'aud',
-        iss: 'iss',
-      };
-      queryBusMock.execute.mockResolvedValue(mockPayload);
+    const result = await adapter.verifyToken('valid-token');
 
-      const result = await adapter.verifyToken('valid-token');
-
-      expect(queryBusMock.execute).toHaveBeenCalledWith(
-        new VerifyAccessTokenQuery('valid-token'),
-      );
-      expect(result).toEqual({
-        sub: 'user-1',
-        role: 'user',
-        exp: 123456789,
-      });
+    expect(jwtService.verifyAsync).toHaveBeenCalledWith('valid-token', {
+      publicKey: 'user-public-key',
+    });
+    expect(result).toEqual({
+      sub: 'user-1',
+      role: 'USER',
+      exp: 123456789,
     });
   });
 });

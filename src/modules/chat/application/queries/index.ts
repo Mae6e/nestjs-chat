@@ -9,6 +9,8 @@ import { GetGroupJoinRequestsHandler } from './get-group-join-requests/get-group
 import { GetUserGroupConversationListHandler } from './get-user-group-conversation-list/get-user-group-conversation-list.handler';
 import { GetDirectMessageUserIdsHandler } from './get-direct-message-user-ids/get-direct-message-user-ids.handler';
 import { HasUnreadMessagesHandler } from './has-unread-messages/has-unread-messages.handler';
+import { GetIntegrationReportListHandler } from './get-integration-report-list/get-integration-report-list.handler';
+import { GetIntegrationReportMessagesHandler } from './get-integration-report-messages/get-integration-report-messages.handler';
 
 export const QueryHandlers = [
   GetUserConversationListHandler,
@@ -22,4 +24,6 @@ export const QueryHandlers = [
   GetGroupMembersHandler,
   GetGroupJoinRequestsHandler,
   HasUnreadMessagesHandler,
+  GetIntegrationReportListHandler,
+  GetIntegrationReportMessagesHandler,
 ];
